@@ -73,6 +73,30 @@ body.role-viewer .role-viewer-only{display:block}
 .drive-role-note-admin{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
 .drive-role-note-viewer{color:#8a6100;background:#fff8e1;border-color:#ffe082}
 .drive-role-note code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px}
+/* §SHAREGATE — full-screen sign-in wall shown when the page is opened via a
+   direct "?form=<id>" share link. Nothing behind it (dashboard/builder) is
+   reachable until Google sign-in succeeds AND the signed-in account can
+   actually read the target quiz (see _shareGateSignIn / openShareLinkModal). */
+#share-gate-view{position:fixed;inset:0;z-index:5000;background:var(--surface2);display:none;align-items:center;justify-content:center;padding:20px}
+.share-gate-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;max-width:420px;width:100%;padding:32px 28px;text-align:center;box-shadow:0 8px 32px rgba(92,53,177,.14)}
+.share-gate-logo{width:52px;height:52px;background:var(--purple);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.share-gate-logo svg{width:28px;height:28px}
+.share-gate-title{font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px}
+.share-gate-sub{font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:22px}
+.share-gate-sub strong{color:var(--text)}
+.share-gate-btn{background:#fff;color:#3c4043;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;padding:11px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:10px;transition:all .15s;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.share-gate-btn:hover{background:var(--surface2);border-color:var(--purple-mid)}
+.share-gate-btn:disabled{opacity:.6;cursor:default}
+.share-gate-btn svg{width:18px;height:18px;flex-shrink:0}
+.share-gate-status{margin-top:16px;font-size:12px;padding:9px 12px;border-radius:8px;line-height:1.5;text-align:left;display:none}
+.share-gate-status.info{display:block;background:var(--purple-dim);color:var(--purple)}
+.share-gate-status.ok{display:block;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.share-gate-status.err{display:block;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.share-gate-links{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.share-gate-links button{background:none;border:none;color:var(--purple);font-size:12px;font-weight:600;cursor:pointer;padding:2px}
+.share-gate-links button:hover{text-decoration:underline}
+.share-link-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+.share-link-row input{flex:1;min-width:0;font-family:'DM Mono',monospace;font-size:11.5px;color:var(--text2);background:var(--surface2);border:1px solid var(--border-light);border-radius:7px;padding:9px 10px}
 #dashboard-view{padding:28px 24px 80px;max-width:1100px;margin:0 auto}
 .dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 .dash-heading{font-size:22px;font-weight:600;color:var(--text)}
@@ -2720,6 +2744,27 @@ button,
     </div>
   </div>
 
+  <!-- §SHAREGATE — shown instead of everything else when the page loads with
+       a "?form=<id>" share link in the URL. See _showShareGate / _shareGateSignIn. -->
+  <div id="share-gate-view" role="dialog" aria-modal="true" aria-labelledby="share-gate-title">
+    <div class="share-gate-card">
+      <div class="share-gate-logo">
+        <svg viewBox="0 0 24 24" fill="#fff"><rect x="3" y="3" width="18" height="18" rx="2.5" fill="rgba(255,255,255,.2)"/><rect x="6" y="7" width="12" height="2" rx="1" fill="#fff"/><rect x="6" y="11" width="12" height="2" rx="1" fill="#fff"/><rect x="6" y="15" width="8" height="2" rx="1" fill="#fff"/></svg>
+      </div>
+      <div class="share-gate-title" id="share-gate-title">Sign in to open this quiz</div>
+      <div class="share-gate-sub" id="share-gate-sub">This is a shared quiz link. Sign in with the Google account you were given access with — you'll be able to take the quiz read-only.</div>
+      <button class="share-gate-btn" id="share-gate-signin-btn" onclick="_shareGateSignIn()">
+        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.6 5.1 29.6 3 24 3c-7.6 0-14.1 4.3-17.4 10.7z"/><path fill="#4CAF50" d="M24 45c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 36.4 26.9 37 24 37c-5.3 0-9.7-3.1-11.3-7.6l-6.6 5.1C9.8 40.6 16.4 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6.6 5.4C41.4 35.6 45 30.4 45 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+        <span id="share-gate-signin-label">Sign in with Google</span>
+      </button>
+      <div class="share-gate-status" id="share-gate-status"></div>
+      <div class="share-gate-links" id="share-gate-links" style="display:none">
+        <button type="button" onclick="_shareGateSignIn()">Use a different Google account</button>
+        <button type="button" id="share-gate-dashboard-btn" style="display:none" onclick="_shareGateGoToDashboard()">Go to all forms</button>
+      </div>
+    </div>
+  </div>
+
   <div id="dashboard-view">
     <span id="anchor-dashboard" class="toc-anchor"></span>
     <div id="dashboard-inner">
@@ -4236,6 +4281,199 @@ function _applyRoleToUI(){
 
 function _driveConfigured(){
   return DRIVE_CLIENT_ID && !DRIVE_CLIENT_ID.startsWith('YOUR_GOOGLE_OAUTH_CLIENT_ID');
+}
+
+// §SHAREGATE ─────────────────────────────────────────────────────────────────
+// Lets an admin hand someone a direct link to ONE quiz, e.g.
+//   https://yourdomain.com/?form=1737000000000
+// Opening that link never shows the dashboard or any other quiz. Instead it
+// shows a full-screen sign-in wall (#share-gate-view) until the visitor
+// authenticates with Google. Once signed in:
+//   - If their email is in ADMIN_EMAILS, they land in the normal editor.
+//   - Otherwise (the "test user" case) _isAdmin is false — same fail-safe
+//     role logic as the rest of the app (§ROLE above) — so they only ever
+//     get the read-only Preview tab for that one form. This is enforced the
+//     same way the rest of the app enforces it: .admin-only controls are
+//     hidden app-wide by the body.role-viewer CSS rule, and (for shared-
+//     library setups) the Drive file itself is read-only to their account
+//     at the network level, not just in this UI.
+//   - Whether Google lets them sign in AT ALL is controlled entirely by
+//     Google, on Google's side: Google Cloud Console → APIs & Services →
+//     OAuth consent screen → "Test users". Only emails on that list (or the
+//     admin's own account) can complete sign-in for an unverified app —
+//     anyone else sees Google's own "access blocked" screen before this app
+//     ever runs. Add every test user's email there (see the DRIVE_CLIENT_ID
+//     comment above for the full one-time setup).
+function _getSharedFormIdFromURL(){
+  try{
+    const raw=new URLSearchParams(location.search).get('form');
+    if(!raw)return null;
+    const n=Number(raw);
+    return Number.isFinite(n)?n:null;
+  }catch(_){return null;}
+}
+// Read once at load. A share link always points at exactly one form for the
+// lifetime of the page load — reloading with a different ?form= re-evaluates
+// this from scratch.
+let _pendingShareFormId=_getSharedFormIdFromURL();
+
+function _shareGateSetStatus(kind,msg){
+  const el=document.getElementById('share-gate-status');
+  if(!el)return;
+  el.className='share-gate-status'+(kind?(' '+kind):'');
+  el.textContent=msg||'';
+  el.style.display=msg?'block':'none';
+}
+
+function _showShareGate(){
+  const gate=document.getElementById('share-gate-view');
+  if(gate)gate.style.display='flex';
+}
+function _hideShareGate(){
+  const gate=document.getElementById('share-gate-view');
+  if(gate)gate.style.display='none';
+}
+
+// Escape hatch shown once someone is signed in but the target quiz still
+// isn't reachable for their account — lets them fall back to whatever forms
+// they DO have access to (e.g. an admin who clicked their own share link).
+function _shareGateGoToDashboard(){
+  _pendingShareFormId=null;
+  _hideShareGate();
+  try{
+    const url=new URL(location.href);
+    url.searchParams.delete('form');
+    window.history.replaceState({},'',url.toString());
+  }catch(_){}
+  renderDashboard();
+}
+
+function _shareGateFriendlyError(e){
+  const msg=(e&&e.message)||'';
+  if(/could not verify|access blocked|access_denied|origin_mismatch|popup_closed|cancelled|failed/i.test(msg)&&/verify|blocked|denied/i.test(msg)){
+    return 'Could not verify your Google account, so access was not granted. Please try signing in again.';
+  }
+  if(/not accessible|403|permission|not found|404/i.test(msg)){
+    return "Your Google account doesn't have access to this quiz yet. Ask the quiz owner to add your email as a test user (and, if this quiz uses shared Drive sync, to share the library file with you).";
+  }
+  if(/cancelled|closed/i.test(msg)){
+    return 'Sign-in was cancelled. Click below to try again.';
+  }
+  return msg||'Something went wrong while signing in. Please try again.';
+}
+
+// Main entry point — wired to the "Sign in with Google" button on the gate.
+async function _shareGateSignIn(){
+  const btn=document.getElementById('share-gate-signin-btn');
+  const links=document.getElementById('share-gate-links');
+  if(btn)btn.disabled=true;
+  if(links)links.style.display='none';
+  _shareGateSetStatus('info','Opening Google sign-in…');
+  // Same pessimistic reset driveConnect() uses: never trust a leftover role
+  // from a previous account/session until THIS account's email is verified.
+  _driveAccountEmail=null;
+  _updateRoleFromEmail();
+  try{
+    await _driveRequestToken(false);
+    await _driveFetchAccountEmail();
+    if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
+      throw new Error('Could not verify your Google account email, so access was not granted.');
+    }
+    _updateRoleFromEmail();
+    _driveConnected=true;
+    try{localStorage.setItem(DRIVE_TOKEN_LS_KEY,'1');}catch(_){}
+    _shareGateSetStatus('info','Loading quiz…');
+    await _driveFindOrCreateFileAndHydrate();
+    _driveRenderModalUI();
+    await _shareGateOpenPendingForm();
+  }catch(e){
+    console.warn('[share-gate] sign-in failed:',e);
+    _shareGateSetStatus('err',_shareGateFriendlyError(e));
+    if(btn)btn.disabled=false;
+    if(links){
+      links.style.display='flex';
+      const dashBtn=document.getElementById('share-gate-dashboard-btn');
+      if(dashBtn)dashBtn.style.display=_isAdmin?'block':'none';
+    }
+  }
+}
+
+// Called after a successful sign-in (manual or silent auto-reconnect) to
+// hand off from the gate into the actual quiz.
+async function _shareGateOpenPendingForm(){
+  const id=_pendingShareFormId;
+  if(id==null)return;
+  const f=forms.find(x=>x.id===id);
+  if(!f){
+    const emailNote=_driveAccountEmail?` (signed in as ${_driveAccountEmail})`:'';
+    _shareGateSetStatus('err','This quiz link is invalid, or your account doesn\'t have access to it yet'+emailNote+'.');
+    const btn=document.getElementById('share-gate-signin-btn');
+    if(btn)btn.disabled=false;
+    const links=document.getElementById('share-gate-links');
+    if(links){
+      links.style.display='flex';
+      const dashBtn=document.getElementById('share-gate-dashboard-btn');
+      if(dashBtn)dashBtn.style.display=_isAdmin?'block':'none';
+    }
+    return;
+  }
+  _shareGateSetStatus('ok','Signed in ✓ Opening quiz…');
+  _folderViewOrigin=null;
+  await openForm(id);
+  _hideShareGate();
+}
+
+// Runs once on boot (see §INIT below) if the page loaded with ?form=<id>. If
+// this browser was already connected to Drive (localStorage remembers
+// "should auto-reconnect" — see DRIVE_TOKEN_LS_KEY), try a SILENT token
+// refresh first so a returning, already-authorized test user doesn't have to
+// click through the button again. This still requires a real prior Google
+// sign-in/consent for this exact account; it is not a bypass.
+async function _shareGateBoot(){
+  if(_pendingShareFormId==null)return;
+  _showShareGate();
+  let wasConnected=false;
+  try{wasConnected=localStorage.getItem(DRIVE_TOKEN_LS_KEY)==='1';}catch(_){}
+  if(!wasConnected||!_driveConfigured())return; // stay on the sign-in button
+  _shareGateSetStatus('info','Checking your Google sign-in…');
+  try{
+    await _driveRequestToken(true);
+    await _driveFetchAccountEmail();
+    if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
+      throw new Error('Could not verify Google account email on silent reconnect.');
+    }
+    _updateRoleFromEmail();
+    _driveConnected=true;
+    await _driveFindOrCreateFileAndHydrate();
+    _driveRenderModalUI();
+    await _shareGateOpenPendingForm();
+  }catch(e){
+    console.warn('[share-gate] silent reconnect failed, falling back to manual sign-in:',e);
+    _driveConnected=false;
+    _driveAccountEmail=null;
+    _updateRoleFromEmail();
+    _shareGateSetStatus('','');
+  }
+}
+
+// Builds the shareable link for a given form id. Used by the "Live link"
+// row in the Share modal (see openShareModal()).
+function _buildShareLink(formId){
+  const url=new URL(location.href);
+  url.hash='';
+  url.searchParams.set('form',String(formId));
+  return url.toString();
+}
+async function copyShareLink(formId){
+  const link=_buildShareLink(formId);
+  try{
+    await navigator.clipboard.writeText(link);
+    showShortcutToast('Share link copied ✓');
+  }catch(_){
+    const input=document.getElementById('share-link-input');
+    if(input){input.removeAttribute('readonly');input.focus();input.select();}
+    showShortcutToast('Select the link and copy it manually');
+  }
 }
 
 function _driveSetStatus(kind,msg){
@@ -9303,6 +9541,13 @@ function downloadXlsx(filename,sheets){
 // Bootstrap sequence: load groups from localStorage, open IndexedDB,
 // then render the dashboard. Everything else is event-driven from here.
 _initGroups();
+// §SHAREGATE boot hook — if this page load came from a "?form=<id>" share
+// link, throw up the sign-in wall immediately (before anything else has a
+// chance to paint) so the dashboard/other quizzes are never visible even
+// for a frame. Everything below still runs underneath it (loading local
+// cache, etc.) — it's just hidden until _shareGateSignIn/_shareGateBoot
+// takes it down.
+if(_pendingShareFormId!=null)_showShareGate();
 // Safety net: initDB() should always resolve (see migrateFromLocalStorage
 // fix above), but on the off chance some other storage edge case on a
 // given device causes it to hang, we don't want the whole app to stay
@@ -9332,7 +9577,13 @@ setTimeout(()=>{
 // blocks the initial paint.
 _driveRenderModalUI();
 _applyRoleToUI(); // fail-safe default (viewer, if ADMIN_EMAILS is set) until Drive reconnect proves otherwise
-setTimeout(()=>{ driveTryAutoReconnect(); },300);
+setTimeout(()=>{
+  // A pending share link always goes through the gate's own (silent-then-
+  // manual) sign-in flow instead of the normal dashboard auto-reconnect, so
+  // that a successful reconnect can hand off straight into the target quiz.
+  if(_pendingShareFormId!=null)_shareGateBoot();
+  else driveTryAutoReconnect();
+},300);
 
 // ── ADMIN_EMAILS misconfiguration guard ─────────────────────────────────────
 // If ADMIN_EMAILS is left empty, role-checking is intentionally OFF and the
@@ -9756,6 +10007,23 @@ async function openShareModal(formId){
 
   const body=document.getElementById('share-modal-body');
   body.innerHTML='';
+
+  const s0=document.createElement('div');s0.className='share-section';
+  const t0=document.createElement('div');t0.className='share-section-title';
+  _setSafeInnerHTML(t0,`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>Live link (sign-in required)`);
+  const linkDesc=document.createElement('div');linkDesc.className='share-action-desc';
+  linkDesc.style.marginBottom='4px';
+  const linkStrong=document.createElement('strong');linkStrong.textContent='Opens this exact quiz, read-only';
+  linkDesc.append(linkStrong,document.createTextNode(' — the person still has to sign in with Google, and only sees/edits anything once they do. Anyone not in your Google Cloud OAuth consent screen\'s "Test users" list (or admin) can\'t sign in at all; everyone who can sign in but isn\'t an admin (see ADMIN_EMAILS) only ever gets read-only access to take the quiz.'));
+  const linkRow=document.createElement('div');linkRow.className='share-link-row';
+  const linkInput=document.createElement('input');linkInput.type='text';linkInput.id='share-link-input';linkInput.readOnly=true;linkInput.value=_buildShareLink(f.id);
+  linkInput.setAttribute('aria-label','Shareable sign-in link for '+f.title);
+  linkInput.addEventListener('click',()=>linkInput.select());
+  const copyBtn=document.createElement('button');copyBtn.className='btn-share';copyBtn.textContent='Copy link';
+  copyBtn.addEventListener('click',()=>copyShareLink(f.id));
+  linkRow.append(linkInput,copyBtn);
+  s0.append(t0,linkDesc,linkRow);
+  body.appendChild(s0);
 
   const s1=document.createElement('div');s1.className='share-section';
   const t1=document.createElement('div');t1.className='share-section-title';
