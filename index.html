@@ -819,28 +819,48 @@ kbd{background:var(--surface);border:1.5px solid var(--border);border-bottom-wid
 .p-translation-source{margin-bottom:10px;padding:9px 13px;background:var(--surface2);border-radius:6px;font-size:13px;font-style:italic;border-left:3px solid var(--purple-mid)}
 
 /* ── Spoiler-style inline hints (Telegram-esque tap-to-reveal) ────────────
-   Wraps [bracketed] vocab/answer hints inside a translation question's
-   source sentence. Hidden by default behind a solid blob; tap/click or
-   Enter/Space reveals the real text underneath, tap again to re-hide. */
+   Wraps [bracketed], (parenthesized), or {curly} vocab/answer hints inside
+   a question's text with a tap-to-reveal spoiler. Hidden by default behind
+   a dotted noise texture — the same visual language as Telegram's spoiler,
+   not a flat redaction bar. Tap/click or Enter/Space fades the texture out
+   and the real text in; tap again to re-hide. See _spoilerize() in app.js
+   for the delimiter config and \[ \] \( \) \{ \} escaping. */
 .p-spoiler{
+  position:relative;
   cursor:pointer;
   border-radius:5px;
   padding:0 3px;
   margin:0 1px;
-  transition:background-color .18s ease, color .12s ease, text-shadow .12s ease;
+  transition:color .16s ease;
   outline:none;
   -webkit-tap-highlight-color:transparent;
 }
 .p-spoiler[data-revealed="false"]{
-  background:var(--text3,#9aa0a6);
   color:transparent;
-  text-shadow:none;
   user-select:none;
 }
-.p-spoiler[data-revealed="false"]:hover{background:var(--text2,#7a7a7a)}
+.p-spoiler[data-revealed="false"]::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:5px;
+  background-color:var(--text3,#9aa0a6);
+  background-image:radial-gradient(rgba(255,255,255,.6) 1px, transparent 1.4px);
+  background-size:5px 5px;
+  transition:background-color .16s ease;
+}
+.p-spoiler[data-revealed="false"]:hover::before{background-color:var(--text2,#7a7a7a)}
 .p-spoiler[data-revealed="true"]{
   background:var(--purple-dim);
   color:#4a148c;
+}
+.p-spoiler[data-revealed="true"]::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:5px;
+  opacity:0;
+  transition:opacity .16s ease;
 }
 .p-spoiler:focus-visible{outline:2px solid var(--purple,#5c35b1);outline-offset:2px}
 .p-drag-clear-btn{background:none;border:none;cursor:pointer;color:var(--text3);margin-left:auto}
@@ -3660,24 +3680,75 @@ const _setSafeInnerHTML = _setSafeHTML;
  * @returns {string}     HTML string with links rendered as <a> tags; all other text is escaped.
  */
 /**
- * Wrap [bracketed] hint text inside an ALREADY-HTML-ESCAPED string with a
- * Telegram-style tap-to-reveal spoiler span. Shared by every place a quiz
- * author's text is rendered for students — question labels/titles (via
- * _linkifyText below) as well as translation source sentences (via
- * renderSpoilerSourceText) — so "[vocab: hint]" behaves identically no
- * matter which question type it's typed into.
+ * §SPOILER — delimiter config for tap-to-reveal hint syntax.
+ * Add a new bracket pair here to support it everywhere _spoilerize is
+ * used (question text, translation source sentences) — nothing else in
+ * the pipeline needs to change.
+ */
+const SPOILER_DELIMS = [
+  { open: '[', close: ']' },
+  { open: '(', close: ')' },
+  { open: '{', close: '}' },
+];
+
+/**
+ * Escaping: a quiz author can write \[ \] \( \) \{ \} to force a literal
+ * bracket that is NEVER treated as a hint marker — e.g. "\(1pt\)" so a
+ * point value stays visible even though round brackets are also a spoiler
+ * delimiter. Each escape sequence is swapped for a private-use placeholder
+ * before matching (so the main regex can't see it as a delimiter), then
+ * swapped back to the literal character once matching is done.
+ */
+const _SPOILER_ESCAPES = [
+  ['\\[', '[', '\uE000'], ['\\]', ']', '\uE001'],
+  ['\\(', '(', '\uE002'], ['\\)', ')', '\uE003'],
+  ['\\{', '{', '\uE004'], ['\\}', '}', '\uE005'],
+];
+function _hideSpoilerEscapes(s) {
+  return _SPOILER_ESCAPES.reduce((out, [seq, , ph]) => out.split(seq).join(ph), s);
+}
+function _restoreSpoilerEscapes(s) {
+  return _SPOILER_ESCAPES.reduce((out, [, lit, ph]) => out.split(ph).join(lit), s);
+}
+function _escapeRegexChar(ch) {
+  return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function _spoilerPattern() {
+  const parts = SPOILER_DELIMS.map(({ open, close }) => {
+    const o = _escapeRegexChar(open), c = _escapeRegexChar(close);
+    return `${o}([^${o}${c}]+)${c}`; // one capture group per delimiter
+  });
+  return new RegExp(parts.join('|'), 'g');
+}
+
+/**
+ * Wrap [bracketed], (parenthesized), or {curly} hint text inside an
+ * ALREADY-HTML-ESCAPED string with a Telegram-style tap-to-reveal spoiler
+ * span. Shared by every place a quiz author's text is rendered for
+ * students — question labels/titles (via _linkifyText below) as well as
+ * translation source sentences (via renderSpoilerSourceText) — so a hint
+ * behaves identically no matter which bracket style or question type it's
+ * typed into. Escaped brackets (\[ \] \( \) \{ \}) are left as literal
+ * text and never become a spoiler.
  * @param {string} escapedHtml  Text that has ALREADY been HTML-escaped.
- * @returns {string} HTML with bracketed hints replaced by spoiler spans.
+ * @returns {string} HTML with hints replaced by spoiler spans.
  */
 function _spoilerize(escapedHtml) {
   if (!escapedHtml) return '';
-  return escapedHtml.replace(/\[([^\[\]]+)\]/g, (_m, inner) =>
-    `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
-    `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
-    `onclick="toggleSpoiler(this)" `+
-    `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
-    `[${inner}]</span>`
-  );
+  const hidden = _hideSpoilerEscapes(escapedHtml);
+  const out = hidden.replace(_spoilerPattern(), function () {
+    const args = Array.prototype.slice.call(arguments, 0, -2); // drop offset, fullString
+    const groups = args.slice(1);
+    const idx = groups.findIndex(g => g !== undefined);
+    const { open, close } = SPOILER_DELIMS[idx];
+    const inner = groups[idx];
+    return `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
+      `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
+      `onclick="toggleSpoiler(this)" `+
+      `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
+      `${open}${inner}${close}</span>`;
+  });
+  return _restoreSpoilerEscapes(out);
 }
 
 function _linkifyText(text) {
@@ -9399,12 +9470,16 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 // ── Spoiler-style hints in translation source sentences ─────────────────────
 // Question authors can embed a vocab/grammar hint inline in the source
-// sentence using square brackets, e.g.
+// sentence using square brackets, parentheses, or curly braces, e.g.
 //   "I put my phone on the desk. [poner: to put / sobre: on / escritorio: desk]"
+//   "I put my phone on the desk. (poner: to put / sobre: on / escritorio: desk)"
 // Since that bracketed part basically hands the student the answer, it's
 // hidden behind a Telegram-style tap-to-reveal spoiler in the student-facing
 // preview instead of being shown outright. The plain-text editor (where the
 // teacher writes the sentence) is untouched — only the rendered preview.
+// A literal bracket that ISN'T meant as a hint (e.g. a point value like
+// "(1pt)") can be escaped as "\(1pt\)" to keep it out of the spoiler — see
+// _spoilerize() / SPOILER_DELIMS above for the full delimiter + escape rules.
 function renderSpoilerSourceText(text){
   const esc=escHtml(text||'');
   if(!esc)return'(No source text)';
@@ -10760,7 +10835,7 @@ document.addEventListener('touchstart',e=>{
   if(failed===0){
     console.log(`%c✅ All ${total} scoring unit tests passed.`,'color:#2e7d32;font-weight:bold');
   }else{
-    console.warn(`%c⚠ ${failed}/${total} scoring tests FAILED — see errors above.`,'color:#c62828;font-weight:bold');
+    console.warn(`%c⚠ ${failed}/${total} scoring tests FAILED — see errors above.`,'color:#c62828;fonta-weight:bold');
   }
 })();
 
