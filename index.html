@@ -6712,6 +6712,37 @@ function openForm(id){
   const f=forms.find(x=>x.id===id);if(!f)return Promise.resolve();
   // Stop any timer from a previously open form before wiping preview state
   stopPreviewTimer();
+  // ROOT-CAUSE FIX (timer never starts for non-admin/test-mode users after the
+  // first form): switchTab() decides whether it's a "fresh" entry into Preview
+  // — which is what actually calls _enterPreviewTab()/startPreviewTimer() — by
+  // checking whether #preview-tab's OWN style.display was already 'block'
+  // (see `wasOnPreview` in switchTab). That flag is never reset anywhere when
+  // leaving the builder (saveAndGoBack only hides the whole #builder-view
+  // container, not the individual #preview-tab pane inside it), so once a
+  // non-admin has viewed Preview once, #preview-tab is permanently left at
+  // display:block for the rest of the session.
+  //
+  // Admins never hit this because openForm() always routes them through
+  // switchTab('questions') first, which — as a side effect — sets
+  // #preview-tab back to display:none, so the next switchTab('preview') call
+  // (from clicking the Preview button) correctly sees a fresh entry.
+  //
+  // Non-admins/test users skip 'questions' entirely (they have no edit tab)
+  // and go straight to switchTab('preview') below. With #preview-tab already
+  // stuck at 'block' from the last time they took a quiz, switchTab() takes
+  // its "already on preview, just re-render" shortcut instead of running
+  // _enterPreviewTab() — so buildPreviewPages()/renderPreview() run, but
+  // startPreviewTimer() never does. Net effect: every quiz after the very
+  // first one in a session shows a countdown frozen at the full configured
+  // duration that never ticks down, exactly as reported.
+  //
+  // Fix: explicitly reset both tab panes to display:none right here, before
+  // switchTab() runs below, so switchTab() always correctly detects this as
+  // a fresh entry into Preview — regardless of admin/non-admin, regardless of
+  // how many forms were opened before, and regardless of how the previous
+  // form was exited.
+  const _prevTabEl=document.getElementById('preview-tab');if(_prevTabEl)_prevTabEl.style.display='none';
+  const _questTabEl=document.getElementById('questions-tab');if(_questTabEl)_questTabEl.style.display='none';
   // BUG FIX: this reset used to leave `currentPage` untouched. That meant
   // reopening a form you'd previously paused mid-quiz (say on page 3) kept
   // currentPage=3 sitting in STATE even though previewAnswers/timer below
