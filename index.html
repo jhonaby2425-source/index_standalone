@@ -3659,6 +3659,27 @@ const _setSafeInnerHTML = _setSafeHTML;
  * @param {string} text  Raw user-entered text (may contain URLs or markdown links)
  * @returns {string}     HTML string with links rendered as <a> tags; all other text is escaped.
  */
+/**
+ * Wrap [bracketed] hint text inside an ALREADY-HTML-ESCAPED string with a
+ * Telegram-style tap-to-reveal spoiler span. Shared by every place a quiz
+ * author's text is rendered for students — question labels/titles (via
+ * _linkifyText below) as well as translation source sentences (via
+ * renderSpoilerSourceText) — so "[vocab: hint]" behaves identically no
+ * matter which question type it's typed into.
+ * @param {string} escapedHtml  Text that has ALREADY been HTML-escaped.
+ * @returns {string} HTML with bracketed hints replaced by spoiler spans.
+ */
+function _spoilerize(escapedHtml) {
+  if (!escapedHtml) return '';
+  return escapedHtml.replace(/\[([^\[\]]+)\]/g, (_m, inner) =>
+    `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
+    `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
+    `onclick="toggleSpoiler(this)" `+
+    `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
+    `[${inner}]</span>`
+  );
+}
+
 function _linkifyText(text) {
   if (!text) return '';
 
@@ -3704,7 +3725,7 @@ function _linkifyText(text) {
         const href  = ESC(raw);
         return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="preview-link" title="${href}">${_smartLabel(raw)}</a>${trail}`;
       }
-      return ESC(part);
+      return _spoilerize(ESC(part));
     }).join('');
   }
 
@@ -9356,13 +9377,7 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 function renderSpoilerSourceText(text){
   const esc=escHtml(text||'');
   if(!esc)return'(No source text)';
-  return esc.replace(/\[([^\[\]]+)\]/g,(_m,inner)=>
-    `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
-    `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
-    `onclick="toggleSpoiler(this)" `+
-    `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
-    `[${inner}]</span>`
-  );
+  return _spoilerize(esc);
 }
 function toggleSpoiler(el){
   const revealed=el.getAttribute('data-revealed')==='true';
