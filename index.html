@@ -4072,7 +4072,7 @@ const DRIVE_CLIENT_ID = '685955252889-efh55bll8irll4086nnpkapen9cqfnb2.apps.goog
 // didn't create it — that's what lets test users read the admin's shared
 // library below. Both scopes together are still far narrower than full
 // Drive access.
-const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email';
 const DRIVE_FILE_NAME = 'quizbuilder_library.json';
 const DRIVE_SYNC_DEBOUNCE_MS = 2500;
 const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-reconnect", never the token itself
