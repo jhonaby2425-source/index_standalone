@@ -4090,8 +4090,7 @@ const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-r
 //   - Everyone else who is signed in can still connect Drive and take any
 //     published quiz; every editing control is hidden and blocked for them.
 const ADMIN_EMAILS = [
-  'jhonaby24@gmail.com',
-  'jhon.traquena24@gmail.com',
+  // 'you@gmail.com',
 ];
 
 // By default (drive.file scope, no shared file id set below) each Google
@@ -4113,7 +4112,7 @@ const ADMIN_EMAILS = [
 //      (drive.file grants write access only to files an app created for
 //      THAT signed-in account), so test users are read-only at the network
 //      level too, not just in this app's UI.
-const DRIVE_SHARED_FILE_ID = '1e7L-57jQi_yThwbm2ToXhEDAjP21ZcVE';
+const DRIVE_SHARED_FILE_ID = '';
 
 let _driveTokenClient=null;
 let _driveAccessToken=null;
@@ -4216,6 +4215,7 @@ function _driveRenderModalUI(){
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="icon-sm" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         Sync now
       </button>
+      <button class="btn-lib-export outline" onclick="driveSwitchAccount()" title="Sign in with a different Google account">Switch Account</button>
       <button class="btn-lib-export outline" onclick="driveDisconnect()">Disconnect</button>
     `;
     _driveUpdateLastSyncedLabel();
@@ -4283,7 +4283,13 @@ function _driveRequestToken(silent){
       }
     };
     client.error_callback=(err)=>{reject(new Error((err&&err.message)||'Google sign-in was cancelled or failed.'));};
-    client.requestAccessToken(silent?{prompt:''}:{prompt:'consent'});
+    // Manual connects always show Google's "choose an account" screen
+    // (select_account) as well as the consent screen. Without select_account,
+    // Google can silently keep reusing whichever account this app last
+    // authenticated as in this browser, even if the person has since
+    // switched their "active" Google account elsewhere on the page — which
+    // is exactly the "still shows Test mode after switching accounts" bug.
+    client.requestAccessToken(silent?{prompt:''}:{prompt:'select_account consent'});
   });
 }
 
@@ -4328,6 +4334,25 @@ function driveDisconnect(){
   _driveSetStatus('','Disconnected. Your data stays safe in this browser (IndexedDB) but will no longer sync to Drive.');
   _driveRenderModalUI();
   showShortcutToast('Google Drive disconnected');
+}
+
+// One-click "I want a different Google account" — revokes the current
+// token (so Google won't just silently hand it back) and immediately
+// re-opens the connect flow, which forces the account picker (see
+// _driveRequestToken's select_account prompt above).
+function driveSwitchAccount(){
+  try{
+    if(_driveAccessToken&&google&&google.accounts&&google.accounts.oauth2){
+      google.accounts.oauth2.revoke(_driveAccessToken,()=>{});
+    }
+  }catch(_){}
+  _driveAccessToken=null;_driveTokenExpiresAt=0;_driveFileId=null;
+  _driveConnected=false;_driveAccountEmail=null;_driveLastSyncedAt=null;
+  _updateRoleFromEmail();
+  try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
+  clearTimeout(_driveSyncTimer);
+  _driveRenderModalUI();
+  driveConnect();
 }
 
 async function _driveFetchAccountEmail(){
