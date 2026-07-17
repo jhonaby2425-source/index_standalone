@@ -391,6 +391,15 @@ body.role-viewer .role-viewer-only{display:block}
 .btn-attempts{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;font-size:12px;font-weight:500;padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
 .btn-attempts:hover{background:rgba(255,255,255,.22)}
 .attempts-count-badge{background:#ff6b35;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;min-width:18px;text-align:center}
+.attempt-review-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center;margin-right:2px}
+.attempt-review-btn:hover{color:var(--purple);background:var(--purple-dim)}
+.attempt-detail-modal{max-width:640px}
+.attempt-detail-noanswers{text-align:center;padding:32px 20px;color:var(--text3);font-size:13px}
+.review-accept-row{margin-top:8px;padding-left:29px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.review-accept-btn{background:var(--green-bg);color:var(--green);border:1.5px solid var(--green-border);border-radius:6px;font-size:11px;font-weight:600;padding:5px 10px;cursor:pointer;transition:all .12s}
+.review-accept-btn:hover{background:var(--green);color:#fff}
+.review-already-accepted{font-size:11px;color:var(--green);font-weight:500}
+.review-no-live-q{font-size:11px;color:var(--text3);font-style:italic}
 .preview-wrap{max-width:620px;margin:0 auto;padding:24px 16px 60px;display:flex;flex-direction:column;gap:10px}
 .preview-hdr{background:var(--surface);border-radius:10px;border:1.5px solid var(--border);overflow:hidden}
 .preview-stripe{height:8px;background:var(--form-accent,var(--purple))}
@@ -829,6 +838,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .add-tag-input::placeholder{color:var(--text3)}
 .add-tag-input:focus{border-bottom-color:var(--purple)}
 .tag-bank-hint{font-size:10px;color:var(--text3);margin-top:2px}
+
+/* Quiz-wide search (finds text in ANY section/question, not just the ones
+   currently rendered by the virtual scroller — see renderQSearchResults()). */
+.qsearch-wrap{position:sticky;top:var(--topbar-h);z-index:40;background:var(--surface2);padding:8px 0;margin:-8px 0 2px;display:flex;align-items:center;gap:8px}
+.qsearch-box{position:relative;flex:1;display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:0 10px;box-shadow:0 1px 4px rgba(92,53,177,.06)}
+.qsearch-box:focus-within{border-color:var(--purple);box-shadow:0 0 0 3px rgba(92,53,177,.1)}
+.qsearch-icon{width:14px;height:14px;color:var(--text3);flex-shrink:0}
+.qsearch-input{flex:1;border:none;outline:none;background:transparent;font-size:13px;color:var(--text);padding:9px 8px}
+.qsearch-input::placeholder{color:var(--text3)}
+.qsearch-clear{background:none;border:none;font-size:16px;line-height:1;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:50%}
+.qsearch-clear:hover{color:var(--text);background:var(--surface2)}
+.qsearch-count{font-size:11px;color:var(--text3);white-space:nowrap;padding-right:2px}
+.qsearch-results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(30,20,60,.16);max-height:360px;overflow-y:auto;z-index:60}
+.qsearch-result{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border-light);padding:9px 12px;cursor:pointer;font-family:inherit}
+.qsearch-result:last-child{border-bottom:none}
+.qsearch-result:hover,.qsearch-result:focus-visible{background:var(--purple-dim)}
+.qsearch-result-meta{font-size:10px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;display:flex;gap:6px;align-items:center}
+.qsearch-result-meta .qsr-section{color:var(--text3);font-weight:500;text-transform:none;letter-spacing:0}
+.qsearch-result-snippet{font-size:12.5px;color:var(--text2);line-height:1.45;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.qsearch-result-snippet mark{background:#fff3a3;color:var(--text);border-radius:2px;padding:0 1px}
+.qsearch-empty{padding:16px 14px;font-size:12.5px;color:var(--text3);text-align:center}
+@keyframes qcard-flash-kf{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--purple),0 4px 16px rgba(92,53,177,.25)}}
+.qcard-flash{animation:qcard-flash-kf 1.4s ease}
 
 /* Bank modal */
 .bank-modal{max-width:600px;width:100%}
@@ -2869,6 +2901,15 @@ button,
           <div class="mode-label">Quiz Mode — sets default question type</div>
           <div class="mode-grid" id="mode-grid"></div>
         </div>
+        <div class="qsearch-wrap" id="qsearch-wrap">
+          <div class="qsearch-box">
+            <svg class="qsearch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="qsearch-input" id="qsearch-input" type="search" placeholder="Find in this quiz… (question text, answers, options — searches every section)" oninput="renderQSearchResults(this.value)" onkeydown="qSearchKeydown(event)" aria-label="Search this quiz">
+            <span class="qsearch-count" id="qsearch-count"></span>
+            <button class="qsearch-clear" id="qsearch-clear" style="display:none" onclick="clearQSearch()" aria-label="Clear search" title="Clear search">×</button>
+          </div>
+          <div class="qsearch-results" id="qsearch-results" style="display:none"></div>
+        </div>
         <div id="questions-list"></div>
         <div class="add-q-bar">
           <button class="add-q-btn" onclick="addQuestion()">
@@ -3111,6 +3152,19 @@ button,
   </div>
 </div>
 
+<div class="modal-overlay" id="attempt-detail-modal" style="display:none" onclick="handleAttemptDetailOverlayClick(event)">
+  <div class="modal attempts-modal attempt-detail-modal">
+    <div class="modal-header modal-header--purple">
+      <span class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="modal-title-icon" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span id="attempt-detail-title">Attempt Review</span>
+      </span>
+      <button class="modal-close" onclick="closeAttemptDetailModal()" aria-label="Close attempt review">×</button>
+    </div>
+    <div class="modal-body modal-body--attempts" id="attempt-detail-modal-body"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════════
      DOM TEMPLATES — cloned at runtime instead of innerHTML strings
      ═══════════════════════════════════════════════════════════════ -->
@@ -3145,6 +3199,11 @@ button,
       <div class="attempt-score-badge"></div>
       <div class="attempt-pts"></div>
     </div>
+    <button class="attempt-review-btn" title="Review answers" aria-label="Review this attempt's answers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm" aria-hidden="true">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    </button>
     <button class="attempt-reassign-btn" title="Move to correct form" aria-label="Move attempt to another form">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm" aria-hidden="true">
         <path d="M17 3l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 21l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
@@ -4072,7 +4131,7 @@ const DRIVE_CLIENT_ID = '685955252889-efh55bll8irll4086nnpkapen9cqfnb2.apps.goog
 // didn't create it — that's what lets test users read the admin's shared
 // library below. Both scopes together are still far narrower than full
 // Drive access.
-const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
 const DRIVE_FILE_NAME = 'quizbuilder_library.json';
 const DRIVE_SYNC_DEBOUNCE_MS = 2500;
 const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-reconnect", never the token itself
@@ -4753,12 +4812,18 @@ function triggerAutoSaveWithRescore(){
 // attempts for that form are re-evaluated against the new key automatically.
 // opts.force: also show a toast when nothing changed (used by the manual
 // "Rescore" button so the user always gets confirmation, not just on edits).
-function retrogradeScoreAttempts(formId, opts){
+function retrogradeScoreAttempts(formId, opts, questionsOverride){
   opts=opts||{};
   if(!formId)return;
   const formAttempts=attempts.filter(a=>a.formId===formId);
   if(!formAttempts.length)return;
-  const currentQuestions=items.filter(it=>it.kind==='question');
+  // `items` only ever holds the question list of whichever form is currently
+  // open in the builder. Every existing caller (auto-save-triggered rescore,
+  // the manual "Rescore" button) only ever runs while that form IS the open
+  // one, so reading `items` directly was always correct for them. Passing
+  // questionsOverride lets a caller rescore a form that ISN'T the live one —
+  // see retrogradeScoreAttemptsForForm() below.
+  const currentQuestions=questionsOverride||items.filter(it=>it.kind==='question');
   if(!currentQuestions.length)return;
   let rescored=0,skipped=0;
   formAttempts.forEach(attempt=>{
@@ -4829,6 +4894,22 @@ function rescoreOneAttempt(answers,questions){
     }
   });
   return{earned,total,pct:total>0?Math.round(earned/total*100):null,correct,wrong,hasScorable};
+}
+
+// Safe to call for ANY form's id, unlike retrogradeScoreAttempts() on its
+// own — if `formId` isn't the form currently open in the builder, its saved
+// question list is loaded from IndexedDB first instead of silently scoring
+// against whatever the live `items` array happens to contain (which could be
+// a completely different form, or nothing at all).
+async function retrogradeScoreAttemptsForForm(formId, opts){
+  if(!formId)return;
+  if(formId===currentFormId){
+    retrogradeScoreAttempts(formId, opts);
+    return;
+  }
+  const rec=await loadQuestions(formId).catch(()=>null);
+  const qs=(rec&&rec.items)?rec.items.filter(it=>it.kind==='question'):[];
+  retrogradeScoreAttempts(formId, opts, qs);
 }
 
 function showRetroToast(rescored,skipped){
@@ -5013,6 +5094,7 @@ function renderAttemptsModal(){
     const ptEl=row.querySelector('.attempt-pts');if(a.total>0)ptEl.textContent=a.earned+'/'+a.total+' pts';
     row.querySelector('.attempt-del-btn').addEventListener('click',()=>deleteAttempt(a.id));
     row.querySelector('.attempt-reassign-btn').addEventListener('click',(e)=>openReassignPopover(e,a.id));
+    row.querySelector('.attempt-review-btn').addEventListener('click',()=>openAttemptDetailModal(a.id));
     listDiv.appendChild(row);
   });
   frag.appendChild(listDiv);
@@ -5082,6 +5164,154 @@ function openReassignPopover(e,attemptId){
 
   const close=(ev)=>{if(!pop.contains(ev.target)){pop.remove();document.removeEventListener('mousedown',close);}};
   setTimeout(()=>document.addEventListener('mousedown',close),0);
+}
+
+// §ATTEMPT DETAIL ─────────────────────────────────────────────────────────────
+// Per-question breakdown for a single saved attempt, plus the ability to
+// accept a free-text answer that was marked wrong as *also* correct — without
+// leaving the attempts list. Complements retrogradeScoreAttempts(): accepting
+// an answer here edits the question's answer key and then rescores every past
+// attempt against it, exactly like editing the key by hand in the builder
+// does, just reachable from the wrong answer itself instead of round-tripping
+// through the question editor.
+
+// Scores one saved attempt's answers against a question list, preferring the
+// LIVE current question (so a correction accepted a moment ago is reflected
+// immediately) and falling back to the frozen questionSnapshot for questions
+// that no longer exist in the live form (e.g. deleted since the attempt).
+function computeAttemptResults(a){
+  const liveById=(currentFormId===a.formId)
+    ? new Map(items.filter(it=>it.kind==='question').map(q=>[q.id,q]))
+    : new Map();
+  const snapshot=a.questionSnapshot||[];
+  const results=[];
+  snapshot.forEach(sq=>{
+    const live=liveById.get(sq.id);
+    const q=live||sq;
+    const handler=QUESTION_TYPES[q.type];
+    if(!handler)return;
+    const ans=a.answers?((a.answers[sq.id]!==undefined)?a.answers[sq.id]:a.answers[String(sq.id)]):undefined;
+    const hasCorrect=handler.hasCorrect(q);
+    const{correct=false}=handler.score(q,ans)||{};
+    const pts=parseInt(q.points)||0;
+    results.push({q,ans,correct,hasCorrect,pts,earned:correct?pts:0,isLive:!!live});
+  });
+  return results;
+}
+
+function openAttemptDetailModal(attemptId){
+  renderAttemptDetailModal(attemptId);
+  document.getElementById('attempt-detail-modal').style.display='flex';
+}
+function closeAttemptDetailModal(){document.getElementById('attempt-detail-modal').style.display='none';}
+function handleAttemptDetailOverlayClick(e){if(e.target===document.getElementById('attempt-detail-modal'))closeAttemptDetailModal();}
+
+function renderAttemptDetailModal(attemptId){
+  const a=attempts.find(x=>x.id===attemptId);
+  const body=document.getElementById('attempt-detail-modal-body');
+  const titleEl=document.getElementById('attempt-detail-title');
+  body.innerHTML='';
+  if(!a){closeAttemptDetailModal();return;}
+  titleEl.textContent=(a.formTitle||'Unknown')+' — Attempt Review';
+  if(!a.questionSnapshot||!a.questionSnapshot.length||!a.answers){
+    const emp=_makeDiv('attempt-detail-noanswers');
+    emp.textContent='No answer data was stored for this attempt — nothing to review.';
+    body.appendChild(emp);
+    return;
+  }
+  const results=computeAttemptResults(a);
+  const tpl=document.getElementById('tpl-review-card');
+  const frag=document.createDocumentFragment();
+  results.forEach((r,idx)=>{
+    const{q,ans,correct,hasCorrect}=r;
+    const handler=QUESTION_TYPES[q.type];
+    const ad=handler?handler.formatAnswer(q,ans):(ans||'—');
+    const cd=handler?handler.formatCorrect(q):(q.correct||'');
+    const si=!hasCorrect?'—':correct?'✓':'✗';
+    const sc2=!hasCorrect?'var(--text3)':correct?'var(--green)':'var(--red)';
+    const cb=!hasCorrect?'var(--border)':correct?'var(--green-border)':'var(--red-border)';
+    const cbg=!hasCorrect?'var(--surface)':correct?'var(--green-bg)':'var(--red-bg)';
+    const card=tpl.content.cloneNode(true).querySelector('.review-card');
+    card.style.borderColor=cb;card.style.background=cbg;
+    card.querySelector('.review-q-num').textContent='Q'+(idx+1);
+    card.querySelector('.review-q-label').textContent=(q.type==='translation'?q.sourceText:q.label)||'Untitled';
+    const statusEl=card.querySelector('.review-status');statusEl.style.color=sc2;statusEl.textContent=si;
+    card.querySelector('.review-ans-val').textContent=String(ad||'(not answered)');
+    const corrDiv=card.querySelector('.review-correct');
+    if(hasCorrect&&!correct){card.querySelector('.review-correct-val').textContent=cd;corrDiv.style.display='';}
+
+    // Offer "accept as correct" only for free-text questions marked wrong,
+    // where there's an actual non-blank student answer to accept.
+    const isFreeText=(q.type==='short'||q.type==='translation');
+    const isBlankAns=handler?handler.isBlank(q,ans):true;
+    if(isFreeText&&hasCorrect&&!correct&&!isBlankAns){
+      const acceptRow=_makeDiv('review-accept-row');
+      const btn=_makeBtn('review-accept-btn','✓ Accept this answer as correct',()=>{
+        btn.disabled=true;btn.textContent='Accepting…';
+        acceptAnswerAsCorrect(a.formId,q.id,ans).then(()=>{
+          renderAttemptDetailModal(attemptId);
+          renderAttemptsModal();
+        });
+      });
+      acceptRow.appendChild(btn);
+      if(!r.isLive&&currentFormId!==a.formId){
+        const note=document.createElement('span');note.className='review-no-live-q';
+        note.textContent='(applies to the saved answer key — open the form to see it live)';
+        acceptRow.appendChild(note);
+      }
+      card.appendChild(acceptRow);
+    }
+    frag.appendChild(card);
+  });
+  body.appendChild(frag);
+}
+
+// Promotes `rawAnswer` into the acceptable-answers list of question `qid` in
+// form `formId`, then rescores every past attempt for that form. Works
+// whether or not that form is the one currently open in the builder — see
+// retrogradeScoreAttemptsForForm() for why that distinction matters.
+async function acceptAnswerAsCorrect(formId,qid,rawAnswer){
+  const val=(rawAnswer==null?'':String(rawAnswer)).trim();
+  if(!val)return;
+
+  const isLiveForm=(currentFormId===formId);
+  let qList,q;
+  if(isLiveForm){
+    qList=items;
+    q=qList.find(it=>it.id===qid&&it.kind==='question');
+  } else {
+    const rec=await loadQuestions(formId).catch(()=>null);
+    qList=(rec&&rec.items)?rec.items:[];
+    q=qList.find(it=>it.id===qid&&it.kind==='question');
+  }
+  if(!q){
+    showShortcutToast('This question no longer exists in the form — nothing to update.');
+    return;
+  }
+  if(q.type!=='short'&&q.type!=='translation'){
+    showShortcutToast('Only short-answer and translation questions support extra accepted answers.');
+    return;
+  }
+
+  if(!Array.isArray(q.acceptableAnswers)||!q.acceptableAnswers.length){
+    q.acceptableAnswers=q.correct?[q.correct]:[];
+  }
+  const already=q.acceptableAnswers.some(x=>_normTxt(x)===_normTxt(val));
+  if(!already){
+    const blankIdx=q.acceptableAnswers.findIndex(x=>!x||!x.trim());
+    if(blankIdx>=0)q.acceptableAnswers[blankIdx]=val;
+    else q.acceptableAnswers.push(val);
+  }
+
+  if(isLiveForm){
+    triggerAutoSave();
+    renderBuilder();
+  } else {
+    await dbPutOne(STORE_QUESTIONS,{formId:formId,items:qList});
+  }
+
+  await retrogradeScoreAttemptsForForm(formId,{force:true});
+  showShortcutToast(already?'Already an accepted answer for this question':'Answer accepted — past attempts rescored');
 }
 
 // §SORT ───────────────────────────────────────────────────────────────────────
@@ -6663,7 +6893,7 @@ function duplicateQuestion(id){pushHistory('Duplicate question');const q=items.f
 function updateType(id,val){
   pushHistory('Change type');
   const q=items.find(it=>it.id===id);if(!q)return;
-  q.type=val;q.correct='';
+  q.type=val;q.correct='';q.acceptableAnswers=undefined;
   const handler=QUESTION_TYPES[val];
   if(handler&&handler.newDefaults){
     const defs=handler.newDefaults();
@@ -6680,7 +6910,7 @@ function deleteOption(id,idx){pushHistory('Delete option');const q=items.find(it
 function toggleRequired(id){const q=items.find(it=>it.id===id);if(q)q.required=!q.required;const t=document.querySelector(`#qcard-${id} .toggle-track`);if(t)t.classList.toggle('on',q.required);triggerAutoSave();}
 function addPair(id){pushHistory('Add pair');const q=items.find(it=>it.id===id);if(!q)return;q.pairs.push({left:'Item '+(q.pairs.length+1),right:'Target '+(q.pairs.length+1)});renderBuilder();triggerAutoSaveWithRescore();}
 function deletePair(id,idx){pushHistory('Delete pair');const q=items.find(it=>it.id===id);if(!q||q.pairs.length<=1)return;q.pairs.splice(idx,1);renderBuilder();triggerAutoSaveWithRescore();}
-function addAcceptableAnswer(id){const q=items.find(it=>it.id===id);if(!q)return;if(!q.acceptableAnswers)q.acceptableAnswers=[''];q.acceptableAnswers.push('');renderBuilder();setTimeout(()=>{const ins=document.querySelectorAll(`.trans-ans-input[data-qid="${id}"]`);if(ins.length)ins[ins.length-1].focus();},30);}
+function addAcceptableAnswer(id){const q=items.find(it=>it.id===id);if(!q)return;if(!q.acceptableAnswers)q.acceptableAnswers=[''];q.acceptableAnswers.push('');renderBuilder();triggerAutoSaveWithRescore();setTimeout(()=>{const ins=document.querySelectorAll(`.trans-ans-input[data-qid="${id}"]`);if(ins.length)ins[ins.length-1].focus();},30);}
 function deleteAcceptableAnswer(id,idx){pushHistory('Delete answer');const q=items.find(it=>it.id===id);if(!q||!q.acceptableAnswers||q.acceptableAnswers.length<=1)return;q.acceptableAnswers.splice(idx,1);renderBuilder();triggerAutoSaveWithRescore();}
 function setTF(id,val){const q=items.find(it=>it.id===id);if(q)q.correctTF=val;renderBuilder();triggerAutoSaveWithRescore();}
 function toggleCorrectOption(id,optVal){const q=items.find(it=>it.id===id);if(!q)return;q.correct=(q.correct&&q.correct.trim().toLowerCase()===optVal.trim().toLowerCase())?'':optVal;renderBuilder();triggerAutoSaveWithRescore();}
@@ -6697,7 +6927,7 @@ function renderBuilder(){
     list.innerHTML='';
     const emp=document.createElement('div');emp.className='empty-state';
     _setSafeInnerHTML(emp,'<div class="empty-icon">✦</div><p>Click <strong>Add Question</strong> to start building.</p>');
-    list.appendChild(emp);updateStats();return;
+    list.appendChild(emp);updateStats();_refreshQSearchIfActive();return;
   }
 
   const ae=document.activeElement;
@@ -6736,6 +6966,8 @@ function renderBuilder(){
   if(_virtRenderEnd < items.length){
     _attachVirtSentinel(list, qs);
   }
+
+  _refreshQSearchIfActive();
 }
 
 function _virtAppend(list, qs, targetEnd){
@@ -6804,6 +7036,123 @@ function jumpToItemPage(id){
       if(rem>0) _attachVirtSentinel(list, qs);
     }
   }
+}
+
+// §QSEARCH ────────────────────────────────────────────────────────────────────
+// Quiz-wide "find" that searches the *data* (the `items` array) instead of the
+// DOM. This matters because the questions list uses a virtual scroller
+// (renderBuilder → _virtAppend/_attachVirtSentinel above): only items near the
+// top (or ones you've scrolled past) actually exist as DOM nodes at any given
+// moment. Native Ctrl+F can only find text that's currently in the DOM, so a
+// sentence living in a section you haven't scrolled to is invisible to it —
+// that's the "search finds nothing, but scrolling to the section finds it
+// fine" bug. Searching `items` directly sidesteps that entirely, and clicking
+// a result calls jumpToItemPage() to force that item into the DOM before
+// scrolling to it.
+//
+// The search box itself lives outside #questions-list (see the HTML), so
+// renderBuilder()'s `list.innerHTML=''` never wipes it or its results — and
+// renderBuilder() re-runs the active query after every edit (bottom of this
+// block) so results stay correct instead of going stale the moment you type
+// into a matched field.
+function _qSearchItemText(it){
+  if(it.kind==='section')return[it.title,it.description].filter(Boolean).join(' ');
+  const parts=[it.label||'',it.sourceText||''];
+  if(Array.isArray(it.options))parts.push(it.options.join(' '));
+  if(it.correct)parts.push(it.correct.split('|||').join(' '));
+  if(Array.isArray(it.acceptableAnswers))parts.push(it.acceptableAnswers.join(' '));
+  if(Array.isArray(it.pairs))it.pairs.forEach(p=>{parts.push(p.left||'');parts.push(p.right||'');});
+  return parts.filter(Boolean).join(' ');
+}
+function _qSearchSnippet(text,q){
+  const li=text.toLowerCase().indexOf(q.toLowerCase());
+  if(li<0)return escHtml(text.slice(0,100));
+  const start=Math.max(0,li-35),end=Math.min(text.length,li+q.length+45);
+  const pre=(start>0?'…':'')+text.slice(start,li);
+  const hit=text.slice(li,li+q.length);
+  const post=text.slice(li+q.length,end)+(end<text.length?'…':'');
+  return escHtml(pre)+'<mark>'+escHtml(hit)+'</mark>'+escHtml(post);
+}
+function renderQSearchResults(raw){
+  const q=(raw||'').trim();
+  const box=document.getElementById('qsearch-results');
+  const clearBtn=document.getElementById('qsearch-clear');
+  const countEl=document.getElementById('qsearch-count');
+  if(clearBtn)clearBtn.style.display=q?'block':'none';
+  if(!q){if(box)box.style.display='none';if(countEl)countEl.textContent='';return;}
+  const qs=items.filter(it=>it.kind==='question');
+  const ql=q.toLowerCase();
+  const matches=[];
+  items.forEach((it,idx)=>{
+    const text=_qSearchItemText(it);
+    if(text.toLowerCase().includes(ql)){
+      let sectionTitle='';
+      for(let i=idx-1;i>=0;i--){if(items[i].kind==='section'){sectionTitle=_plainTextTitle(items[i].title)||'Untitled section';break;}}
+      matches.push({
+        id:it.id,
+        label:it.kind==='section'?('Section: '+(_plainTextTitle(it.title)||'Untitled section')):('Q'+(qs.indexOf(it)+1)),
+        sectionTitle:it.kind==='section'?'':sectionTitle,
+        snippet:_qSearchSnippet(text,q),
+      });
+    }
+  });
+  if(countEl)countEl.textContent=matches.length?`${matches.length} match${matches.length!==1?'es':''}`:'No matches';
+  if(!box)return;
+  if(!matches.length){
+    box.style.display='block';
+    _setSafeInnerHTML(box,'<div class="qsearch-empty">No matches in this quiz.</div>');
+    return;
+  }
+  box.innerHTML='';
+  matches.slice(0,60).forEach(m=>{
+    const row=document.createElement('button');
+    row.className='qsearch-result';
+    row.type='button';
+    const meta=document.createElement('div');meta.className='qsearch-result-meta';
+    const badge=document.createElement('span');badge.textContent=m.label;
+    meta.appendChild(badge);
+    if(m.sectionTitle){const sec=document.createElement('span');sec.className='qsr-section';sec.textContent='· '+m.sectionTitle;meta.appendChild(sec);}
+    const snip=document.createElement('div');snip.className='qsearch-result-snippet';_setSafeInnerHTML(snip,m.snippet);
+    row.append(meta,snip);
+    // mousedown (not click) fires before the input's blur hides the panel.
+    row.addEventListener('mousedown',e=>{e.preventDefault();goToQSearchResult(m.id);});
+    box.appendChild(row);
+  });
+  box.style.display='block';
+}
+function goToQSearchResult(id){
+  jumpToItemPage(id);
+  const box=document.getElementById('qsearch-results');if(box)box.style.display='none';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const card=document.getElementById('qcard-'+id);
+    if(card){
+      card.scrollIntoView({behavior:'smooth',block:'center'});
+      card.classList.remove('qcard-flash');void card.offsetWidth;card.classList.add('qcard-flash');
+      setTimeout(()=>card.classList.remove('qcard-flash'),1500);
+    }
+  }));
+}
+function qSearchKeydown(e){
+  const box=document.getElementById('qsearch-results');
+  if(e.key==='Escape'){clearQSearch();e.target.blur();return;}
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const first=box&&box.querySelector('.qsearch-result');
+    if(first)first.dispatchEvent(new MouseEvent('mousedown'));
+  }
+}
+function clearQSearch(){
+  const inp=document.getElementById('qsearch-input');if(inp)inp.value='';
+  renderQSearchResults('');
+  if(inp)inp.focus();
+}
+// Re-run the active search after every re-render (i.e. after any edit) so a
+// result list never goes stale — the whole point being that finding a
+// sentence, editing it, and finding the *next* one shouldn't require
+// re-searching from scratch.
+function _refreshQSearchIfActive(){
+  const inp=document.getElementById('qsearch-input');
+  if(inp&&inp.value.trim())renderQSearchResults(inp.value);
 }
 
 function builderGoPage(p){
@@ -6911,7 +7260,6 @@ function bindBuilderEvents(){
       if(it.options){it.options.forEach((_,idx)=>{const oi=document.querySelector(`.opt-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(oi){oi.removeEventListener('input',oi._h);oi._h=e=>updateOption(it.id,idx,e.target.value);oi.addEventListener('input',oi._h);}});}
       if(it.pairs){it.pairs.forEach((_,idx)=>{const pl=document.querySelector(`.pair-left[data-qid="${it.id}"][data-idx="${idx}"]`);const pr=document.querySelector(`.pair-right[data-qid="${it.id}"][data-idx="${idx}"]`);if(pl){pl.removeEventListener('input',pl._h);pl._h=e=>updatePairLeft(it.id,idx,e.target.value);pl.addEventListener('input',pl._h);}if(pr){pr.removeEventListener('input',pr._h);pr._h=e=>updatePairRight(it.id,idx,e.target.value);pr.addEventListener('input',pr._h);}});}
       if(it.acceptableAnswers){it.acceptableAnswers.forEach((_,idx)=>{const ai=document.querySelector(`.trans-ans-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(ai){ai.removeEventListener('input',ai._h);ai._h=e=>updateAcceptableAnswer(it.id,idx,e.target.value);ai.addEventListener('input',ai._h);}});}
-      const ci=document.querySelector(`.correct-ans-input[data-qid="${it.id}"]`);if(ci){ci.removeEventListener('input',ci._h);ci._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.correct=e.target.value;triggerAutoSaveWithRescore();}};ci.addEventListener('input',ci._h);}
       const pi=document.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value)||0;triggerAutoSave();}};pi.addEventListener('input',pi._h);}
       const ts=document.querySelector(`.trans-source[data-qid="${it.id}"]`);if(ts){ts.removeEventListener('input',ts._h);ts._h=e=>{
         const q=items.find(x=>x.id===it.id);
@@ -6985,6 +7333,40 @@ function _makeDiv(cls){
   const d=document.createElement('div');if(cls)d.className=cls;return d;
 }
 
+// Shared list editor for "one or more acceptable answers" (used by the
+// `translation` type and, since short-answer questions were extended to
+// accept multiple phrasings, by `short` too). Reuses the existing generic
+// addAcceptableAnswer/deleteAcceptableAnswer/updateAcceptableAnswer handlers
+// (they already operate purely on q.acceptableAnswers, not on q.type) and the
+// existing .trans-ans-* CSS/rebind wiring in bindBuilderEvents(), so no new
+// event plumbing is needed for either caller.
+function _buildAcceptableAnswersEditor(q,frag,opts){
+  opts=opts||{};
+  const ansBlock=document.createElement('div');ansBlock.className='trans-answers-block';
+  const ansTitle=document.createElement('div');ansTitle.className='trans-answers-title';
+  ansTitle.textContent=opts.title||'✓ Correct / Acceptable Answers';
+  if(opts.note!==null){
+    const note=document.createElement('span');note.className='js-trans-note';
+    note.textContent=opts.note||'(add as many as needed)';
+    ansTitle.appendChild(note);
+  }
+  const ansList=document.createElement('div');ansList.className='trans-ans-list';
+  const ans=(q.acceptableAnswers&&q.acceptableAnswers.length)?q.acceptableAnswers:[''];
+  const placeholderPrefix=opts.placeholderPrefix||'Acceptable answer ';
+  ans.forEach((a,idx)=>{
+    const row=document.createElement('div');row.className='trans-ans-row';
+    const num=document.createElement('span');num.className='trans-ans-num';num.textContent=(idx+1)+'.';
+    const inp=_makeInput('trans-ans-input',{placeholder:placeholderPrefix+(idx+1)+'…',value:a||''},{qid:q.id,idx:idx});
+    row.append(num,inp);
+    if(ans.length>1)row.appendChild(_makeBtn('trans-ans-del','×',()=>deleteAcceptableAnswer(q.id,idx)));
+    ansList.appendChild(row);
+  });
+  const addAnsBtn=_makeBtn('add-trans-ans-btn','+ Add another acceptable answer',()=>addAcceptableAnswer(q.id));
+  ansBlock.append(ansTitle,ansList,addAnsBtn);
+  frag.appendChild(ansBlock);
+  return ansBlock;
+}
+
 // §QUESTION_TYPES ─────────────────────────────────────────────────────────────
 // Registry of every supported question type.
 // Each entry must implement:
@@ -7006,7 +7388,33 @@ function _makeDiv(cls){
 // standard keyboard, which normally produces NFC). Without this, answers
 // that look 100% correct on screen can be silently marked wrong.
 function _normTxt(s){
-  return (s==null?'':String(s)).normalize('NFC').trim().toLowerCase();
+  return (s==null?'':String(s))
+    .normalize('NFC')
+    .trim()
+    .toLowerCase()
+    // Collapse runs of whitespace (e.g. a stray double space) to one, so
+    // "lo haga  yo" and "lo haga yo" compare equal.
+    .replace(/\s+/g,' ')
+    // Strip punctuation that only wraps the sentence (leading ¿ ¡ quotes/
+    // parens, trailing . , ! ? ; : quotes/parens) so "Es mejor que lo haga
+    // yo" and "Es mejor que lo haga yo." are treated as the same answer.
+    // NOTE: this intentionally does NOT touch punctuation in the middle of
+    // the string, so it won't accidentally merge two genuinely different
+    // sentences.
+    .replace(/^[¿¡"'“”‘’(]+/,'')
+    .replace(/[.,!?;:"'“”‘’)]+$/,'');
+}
+
+// Returns the effective list of acceptable answers for a "short" question.
+// Newer questions store a list in q.acceptableAnswers (same shape as the
+// "translation" type, added so a teacher can register more than one correct
+// phrasing — see acceptAnswerAsCorrect() and the Attempt Review UI). Older
+// saved questions only ever had a single q.correct string; this helper falls
+// back to that transparently so nothing needs a one-time data migration pass
+// and old saved forms keep scoring exactly as before.
+function _shortAcceptable(q){
+  if(Array.isArray(q.acceptableAnswers)&&q.acceptableAnswers.length)return q.acceptableAnswers;
+  return q.correct?[q.correct]:[''];
 }
 const QUESTION_TYPES = {
 
@@ -7122,23 +7530,8 @@ const QUESTION_TYPES = {
     buildEditor(q,frag){
       const srcInp=_makeInput('trans-source',{placeholder:'Source sentence to translate…',value:q.sourceText||''},{qid:q.id});
       const transHint=document.createElement('div');transHint.className='trans-hint';transHint.textContent='Students will type their translation below.';
-      const ansBlock=document.createElement('div');ansBlock.className='trans-answers-block';
-      const ansTitle=document.createElement('div');ansTitle.className='trans-answers-title';ansTitle.textContent='✓ Correct / Acceptable Answers';
-      const note=document.createElement('span');note.className='js-trans-note';note.textContent='(add as many as needed)';
-      ansTitle.appendChild(note);
-      const ansList=document.createElement('div');ansList.className='trans-ans-list';
-      const ans=q.acceptableAnswers||[''];
-      ans.forEach((a,idx)=>{
-        const row=document.createElement('div');row.className='trans-ans-row';
-        const num=document.createElement('span');num.className='trans-ans-num';num.textContent=(idx+1)+'.';
-        const inp=_makeInput('trans-ans-input',{placeholder:'Acceptable answer '+(idx+1)+'…',value:a||''},{qid:q.id,idx:idx});
-        row.append(num,inp);
-        if(ans.length>1)row.appendChild(_makeBtn('trans-ans-del','×',()=>deleteAcceptableAnswer(q.id,idx)));
-        ansList.appendChild(row);
-      });
-      const addAnsBtn=_makeBtn('add-trans-ans-btn','+ Add another acceptable answer',()=>addAcceptableAnswer(q.id));
-      ansBlock.append(ansTitle,ansList,addAnsBtn);
-      frag.append(srcInp,transHint,ansBlock);
+      frag.append(srcInp,transHint);
+      _buildAcceptableAnswersEditor(q,frag);
     },
     buildPreview(q,ans){
       const acceptable=q.acceptableAnswers||[];
@@ -7292,21 +7685,31 @@ const QUESTION_TYPES = {
 
   short: {
     buildEditor(q,frag){
+      // One-time migration: older saved questions only have a single
+      // q.correct string. The first time the editor renders for one of
+      // these, promote it into the acceptableAnswers array so the list UI
+      // (and any further edits) works on the new shape. Scoring itself never
+      // depends on this running — see _shortAcceptable() — so quizzes whose
+      // editor is never reopened keep grading correctly either way.
+      if(!Array.isArray(q.acceptableAnswers)||!q.acceptableAnswers.length){
+        q.acceptableAnswers=q.correct?[q.correct]:[''];
+      }
       const prev=_makeInput('short-preview',{placeholder:'Short answer text',disabled:''});
-      const caRow=document.createElement('div');caRow.className='correct-ans-row js-correct-row-mt';
-      const caLabel=document.createElement('span');caLabel.className='correct-ans-label';caLabel.textContent='✓ Correct answer:';
-      const caInp=_makeInput('correct-ans-input',{placeholder:'Expected answer (for auto-grading)',value:q.correct||''},{qid:q.id});
-      caRow.append(caLabel,caInp);frag.append(prev,caRow);
+      frag.appendChild(prev);
+      _buildAcceptableAnswersEditor(q,frag,{placeholderPrefix:'Acceptable answer '});
     },
     buildPreview(q,ans){
       return`<div class="p-input-wrap"><input class="p-text-input" id="pinp-${q.id}" type="text" placeholder="Your answer" value="${escHtml(ans||'')}"><div class="p-uline"></div></div>`;
     },
-    score(q,ans){return{correct:!!(q.correct&&_normTxt(ans)===_normTxt(q.correct))};},
-    hasCorrect(q){return!!(q.correct&&q.correct.trim());},
-    importDefaults(){return{};},
-    newDefaults(){return{};},
+    score(q,ans){
+      const ac=_shortAcceptable(q).map(_normTxt).filter(Boolean);
+      return{correct:ac.length>0&&ac.includes(_normTxt(ans))};
+    },
+    hasCorrect(q){return _shortAcceptable(q).some(a=>a&&a.trim());},
+    importDefaults(obj){return{acceptableAnswers:(obj.acceptableAnswers&&obj.acceptableAnswers.length)?obj.acceptableAnswers:[obj.correct||obj.answer||'']};},
+    newDefaults(){return{acceptableAnswers:['']};},
     formatAnswer(q,ans){return ans||'—';},
-    formatCorrect(q){return q.correct||'';},
+    formatCorrect(q){return _shortAcceptable(q).filter(a=>a&&a.trim()).join(' / ');},
     isBlank(q,ans){return!ans||String(ans).trim()==='';},
   },
 
@@ -9885,6 +10288,24 @@ document.addEventListener('touchstart',e=>{
   assert('short: isBlank empty',QUESTION_TYPES.short.isBlank(shortQ,''),true);
   assert('short: isBlank spaces',QUESTION_TYPES.short.isBlank(shortQ,'   '),true);
   assert('short: isBlank answered',QUESTION_TYPES.short.isBlank(shortQ,'42'),false);
+
+  // Legacy data (single q.correct string, no acceptableAnswers) must keep
+  // scoring exactly as before — see _shortAcceptable()'s fallback.
+  assert('short: hasCorrect legacy field',QUESTION_TYPES.short.hasCorrect({correct:'42'}),true);
+  assert('short: hasCorrect legacy empty',QUESTION_TYPES.short.hasCorrect({correct:''}),false);
+  assert('short: formatCorrect legacy field',QUESTION_TYPES.short.formatCorrect({correct:'42'}),'42');
+
+  // New data shape: multiple acceptable answers, same pattern as 'translation'.
+  const shortQ2={acceptableAnswers:['42','forty-two','forty two']};
+  assert('short: acceptableAnswers exact',QUESTION_TYPES.short.score(shortQ2,'42').correct,true);
+  assert('short: acceptableAnswers alt phrasing',QUESTION_TYPES.short.score(shortQ2,'forty-two').correct,true);
+  assert('short: acceptableAnswers case-insensitive',QUESTION_TYPES.short.score(shortQ2,'FORTY TWO').correct,true);
+  assert('short: acceptableAnswers wrong',QUESTION_TYPES.short.score(shortQ2,'43').correct,false);
+  assert('short: hasCorrect with acceptableAnswers',QUESTION_TYPES.short.hasCorrect(shortQ2),true);
+  assert('short: hasCorrect blank acceptableAnswers',QUESTION_TYPES.short.hasCorrect({acceptableAnswers:['']}),false);
+  assert('short: formatCorrect joins acceptableAnswers',QUESTION_TYPES.short.formatCorrect(shortQ2),'42 / forty-two / forty two');
+  assert('short: importDefaults from correct',QUESTION_TYPES.short.importDefaults({correct:'42'}).acceptableAnswers[0],'42');
+  assert('short: importDefaults from acceptableAnswers',QUESTION_TYPES.short.importDefaults({acceptableAnswers:['A','B']}).acceptableAnswers.length,2);
 
   const transQ={sourceText:'Hello',acceptableAnswers:['Hola','¡Hola!','hola']};
   assert('translation: accepted',QUESTION_TYPES.translation.score(transQ,'Hola').correct,true);
