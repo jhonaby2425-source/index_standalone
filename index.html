@@ -61,6 +61,18 @@ button,input,select,textarea{font-family:inherit}
 .autosave-dot.saved{background:#69f0ae}
 .autosave-dot.saving{background:#ffca28;animation:pulse-dot .7s infinite alternate}
 @keyframes pulse-dot{from{opacity:.5}to{opacity:1}}
+/* §ROLE — everything tagged .admin-only disappears for signed-in accounts
+   that don't match ADMIN_EMAILS. See _applyRoleToUI() in the Drive module. */
+body.role-viewer .admin-only{display:none!important}
+.role-viewer-only{display:none}
+body.role-viewer .role-viewer-only{display:block}
+.role-badge{display:none;align-items:center;font-size:11px;font-weight:600;letter-spacing:.2px;padding:3px 9px;border-radius:20px;margin-left:8px;white-space:nowrap}
+.role-badge-admin{background:rgba(255,255,255,.18);color:#fff}
+.role-badge-viewer{background:#ffca28;color:#3d2c00}
+.drive-role-note{font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border-light);border-radius:8px;padding:8px 10px;margin-top:10px;line-height:1.5}
+.drive-role-note-admin{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
+.drive-role-note-viewer{color:#8a6100;background:#fff8e1;border-color:#ffe082}
+.drive-role-note code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px}
 #dashboard-view{padding:28px 24px 80px;max-width:1100px;margin:0 auto}
 .dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 .dash-heading{font-size:22px;font-weight:600;color:var(--text)}
@@ -2575,9 +2587,10 @@ button,
         <span class="topbar-subtitle">Quiz Builder</span>
         <span class="topbar-title" id="topbar-form-title">My Forms</span>
       </div>
+      <span class="role-badge" id="role-badge" style="display:none"></span>
     </div>
     <div class="topbar-tabs" id="topbar-tabs" style="display:none">
-      <button class="tab-btn active" id="tab-questions" onclick="switchTab('questions')">Questions</button>
+      <button class="tab-btn active admin-only" id="tab-questions" onclick="switchTab('questions')">Questions</button>
       <button class="tab-btn" id="tab-preview" onclick="switchTab('preview')">Preview</button>
     </div>
     <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="Menu">
@@ -2585,7 +2598,7 @@ button,
     </button>
     <div class="topbar-right" id="topbar-right">
       <!-- Undo / Redo — shown only in builder, injected by updateUndoRedoUI() -->
-      <div class="btn-undo-redo" id="undo-redo-wrap" style="display:none" title="Undo (Ctrl+Z) / Redo (Ctrl+Y)">
+      <div class="btn-undo-redo admin-only" id="undo-redo-wrap" style="display:none" title="Undo (Ctrl+Z) / Redo (Ctrl+Y)">
         <button class="btn-ur" id="btn-undo" onclick="performUndo()" title="Undo (Ctrl+Z)" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h11a5 5 0 010 10H9"/><polyline points="3 10 7 6 3 2"/></svg>
           <span class="ur-count" id="undo-count" style="display:none">0</span>
@@ -2600,7 +2613,7 @@ button,
         History
         <span class="attempts-count-badge" id="topbar-attempts-count" style="display:none">0</span>
       </button>
-      <button class="btn-new-form btn-new-form--compact" onclick="createNewForm()" id="topbar-new-btn">
+      <button class="btn-new-form btn-new-form--compact admin-only" onclick="createNewForm()" id="topbar-new-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         New Form
       </button>
@@ -2614,7 +2627,7 @@ button,
     <div class="mobile-menu-section" id="mobile-tabs-section" style="display:none">
       <div class="mobile-menu-label">View</div>
       <div class="mobile-menu-tabs">
-        <button class="mobile-tab-btn active" id="mobile-tab-questions" onclick="mobileSwitchTab('questions')">Questions</button>
+        <button class="mobile-tab-btn active admin-only" id="mobile-tab-questions" onclick="mobileSwitchTab('questions')">Questions</button>
         <button class="mobile-tab-btn" id="mobile-tab-preview" onclick="mobileSwitchTab('preview')">Preview</button>
       </div>
     </div>
@@ -2689,11 +2702,11 @@ button,
             My Attempts
             <span class="attempts-count-badge attempts-count-badge--purple" id="dash-attempts-count" style="display:none">0</span>
           </button>
-          <button class="btn-attempts btn-attempts--groups" onclick="openGroupsModal()" title="Organise forms into groups">
+          <button class="btn-attempts btn-attempts--groups admin-only" onclick="openGroupsModal()" title="Organise forms into groups">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><rect x="2" y="3" width="20" height="5" rx="1.5"/><rect x="2" y="10" width="20" height="5" rx="1.5"/><rect x="2" y="17" width="20" height="5" rx="1.5"/></svg>
             Groups
           </button>
-          <button class="btn-attempts btn-attempts--export" onclick="openLibModal()" title="Export or Import your entire quiz library">
+          <button class="btn-attempts btn-attempts--export admin-only" onclick="openLibModal()" title="Export or Import your entire quiz library">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Export / Import
           </button>
@@ -2701,7 +2714,7 @@ button,
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             <span id="dash-drive-btn-label">Drive: Off</span>
           </button>
-          <button class="btn-new-form" onclick="createNewForm()">
+          <button class="btn-new-form admin-only" onclick="createNewForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             New Form
           </button>
@@ -4053,10 +4066,53 @@ function dbDeleteOne(storeName,key){
 //      (No redirect URI needed — this uses the token-client popup flow.)
 //   5. Paste the resulting Client ID below.
 const DRIVE_CLIENT_ID = '685955252889-efh55bll8irll4086nnpkapen9cqfnb2.apps.googleusercontent.com';
-const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// drive.file: lets this app create/edit files it owns (needed for the admin
+// to write the library). drive.readonly: lets ANY signed-in account read a
+// file it has been given "Viewer" access to in Drive, even if this app
+// didn't create it — that's what lets test users read the admin's shared
+// library below. Both scopes together are still far narrower than full
+// Drive access.
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
 const DRIVE_FILE_NAME = 'quizbuilder_library.json';
 const DRIVE_SYNC_DEBOUNCE_MS = 2500;
 const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-reconnect", never the token itself
+
+// §ADMIN ─────────────────────────────────────────────────────────────────────
+// Declares which signed-in Google account(s) are allowed to CREATE / EDIT /
+// DELETE forms & questions. This is layered ON TOP OF the OAuth consent
+// screen's "Test users" list (Google Cloud Console → APIs & Services →
+// OAuth consent screen) — that list controls who can sign in to this app AT
+// ALL, while ADMIN_EMAILS controls who, among those signed-in people, gets
+// editing rights versus read-only "take the quiz" access.
+//   - Matching is case-insensitive.
+//   - Leave the array empty to disable role checking entirely — every
+//     account that can sign in is treated as admin (the original behavior).
+//   - Everyone else who is signed in can still connect Drive and take any
+//     published quiz; every editing control is hidden and blocked for them.
+const ADMIN_EMAILS = [
+  // 'you@gmail.com',
+];
+
+// By default (drive.file scope, no shared file id set below) each Google
+// account that connects gets its OWN private library file in its OWN Drive
+// — nobody else can see it, which makes "other people can only test" mean
+// nothing, since they'd have nothing to test. For everyone to see the SAME
+// quizzes the admin builds:
+//   1. Connect Drive once as the admin (the account listed in ADMIN_EMAILS)
+//      and let it create quizbuilder_library.json — this happens
+//      automatically the first time you connect.
+//   2. Open drive.google.com, find that file, click Share, and add every
+//      test user's email as a Viewer.
+//   3. Open the file in Drive and copy the ID out of its URL
+//      (drive.google.com/file/d/<FILE_ID>/view) — or grab it from the Drive
+//      panel in this app (Export/Import → Drive, while signed in as admin),
+//      which shows it once connected.
+//   4. Paste that ID below and redeploy. From then on every account — admin
+//      or not — reads that exact file. Only the admin can WRITE to it
+//      (drive.file grants write access only to files an app created for
+//      THAT signed-in account), so test users are read-only at the network
+//      level too, not just in this app's UI.
+const DRIVE_SHARED_FILE_ID = '';
 
 let _driveTokenClient=null;
 let _driveAccessToken=null;
@@ -4068,6 +4124,50 @@ let _driveSyncTimer=null;
 let _drivePushInFlight=false;
 let _drivePushQueuedAgain=false;
 let _driveHydrating=false;
+
+// Fail-safe default: if ADMIN_EMAILS is configured, nobody is treated as
+// admin until we've actually verified a signed-in email against that list.
+// If ADMIN_EMAILS is left empty, role-checking is off and everyone is admin
+// (matches the app's original single-user behavior).
+let _isAdmin = ADMIN_EMAILS.length===0;
+
+function _updateRoleFromEmail(){
+  _isAdmin = ADMIN_EMAILS.length===0 ||
+    !!(_driveAccountEmail && ADMIN_EMAILS.some(e=>e.trim().toLowerCase()===_driveAccountEmail.trim().toLowerCase()));
+  _applyRoleToUI();
+}
+
+// Toggles the .role-viewer class on <body>, which a single CSS rule
+// (`.admin-only`) uses to hide every editing control app-wide, updates the
+// role badge, and forces the builder view back to the read-only Preview
+// tab if a non-admin somehow still has the Questions tab open.
+function _applyRoleToUI(){
+  document.body.classList.toggle('role-viewer', !_isAdmin);
+  const badge=document.getElementById('role-badge');
+  if(badge){
+    if(ADMIN_EMAILS.length===0){
+      badge.style.display='none';
+    } else {
+      badge.style.display='inline-flex';
+      badge.textContent=_isAdmin?'★ Admin':'👁 Test mode';
+      badge.className='role-badge'+(_isAdmin?' role-badge-admin':' role-badge-viewer');
+      badge.title=_isAdmin
+        ? 'Signed in as an admin — you can create and edit quizzes.'
+        : 'Signed in as a test user — you can take quizzes but not edit them.';
+    }
+  }
+  const titleInput=document.getElementById('form-title');
+  const descInput=document.getElementById('form-desc');
+  if(titleInput)titleInput.readOnly=!_isAdmin;
+  if(descInput)descInput.readOnly=!_isAdmin;
+  if(!_isAdmin && document.getElementById('tab-questions') &&
+     document.getElementById('tab-questions').classList.contains('active')){
+    switchTab('preview');
+  }
+  if(document.getElementById('dashboard-view') && document.getElementById('dashboard-view').style.display!=='none'){
+    renderDashboard();
+  }
+}
 
 function _driveConfigured(){
   return DRIVE_CLIENT_ID && !DRIVE_CLIENT_ID.startsWith('YOUR_GOOGLE_OAUTH_CLIENT_ID');
@@ -4103,17 +4203,27 @@ function _driveRenderModalUI(){
     return;
   }
   if(_driveConnected){
+    const roleNote = ADMIN_EMAILS.length===0 ? '' :
+      (_isAdmin
+        ? '<div class="drive-role-note drive-role-note-admin">★ You are an admin — your edits sync to Drive.</div>'
+        : '<div class="drive-role-note drive-role-note-viewer">👁 You are a test user — you can take quizzes here, but edits are not saved to Drive.</div>');
     title.textContent='Connected'+(_driveAccountEmail?(' — '+_driveAccountEmail):'');
     sub.textContent='Drive is now the master copy of your library. Every change here is pushed to Drive automatically, and this file can be opened from any other browser or device by connecting the same Google account.';
     actions.innerHTML=`
       <span class="drive-account-chip" id="drive-last-synced"></span>
-      <button class="btn-lib-export" onclick="scheduleDriveSync(true)">
+      <button class="btn-lib-export admin-only" onclick="scheduleDriveSync(true)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="icon-sm" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         Sync now
       </button>
       <button class="btn-lib-export outline" onclick="driveDisconnect()">Disconnect</button>
     `;
     _driveUpdateLastSyncedLabel();
+    if(sub) sub.insertAdjacentHTML('afterend', roleNote +
+      (_isAdmin && _driveFileId && !DRIVE_SHARED_FILE_ID
+        ? `<div class="drive-role-note" id="drive-fileid-note">File ID for sharing this library with test users: <code id="drive-fileid-code">${_escHtml(_driveFileId)}</code> `
+          +`<button class="fc-action" style="padding:2px 8px" onclick="navigator.clipboard&&navigator.clipboard.writeText('${_escHtml(_driveFileId)}');showShortcutToast('File ID copied ✓')">Copy</button>`
+          +`<br><span style="opacity:.75">Share it (Viewer) with test users in Drive, then paste it into DRIVE_SHARED_FILE_ID in the source and redeploy.</span></div>`
+        : ''));
   } else {
     title.textContent='Not connected';
     sub.textContent='Connect a Google account so your entire library lives in your Drive, not just this browser. Once connected, Drive becomes the master copy — this browser keeps a fast local cache and stays in sync automatically.';
@@ -4187,12 +4297,13 @@ async function driveConnect(){
   try{
     await _driveRequestToken(false);
     await _driveFetchAccountEmail();
+    _updateRoleFromEmail();
     _driveConnected=true;
     try{localStorage.setItem(DRIVE_TOKEN_LS_KEY,'1');}catch(_){}
     _driveSetStatus('syncing','Connecting to your library…');
     await _driveFindOrCreateFileAndHydrate();
     _driveSetStatus('ok','Connected. Your library now lives in Drive.');
-    showShortcutToast('Google Drive connected ✓');
+    showShortcutToast(_isAdmin?'Google Drive connected ✓':'Google Drive connected — test mode ✓');
   }catch(e){
     console.warn('[drive] connect failed:',e);
     _driveSetStatus('err','Could not connect: '+e.message);
@@ -4210,6 +4321,7 @@ function driveDisconnect(){
   }catch(_){}
   _driveAccessToken=null;_driveTokenExpiresAt=0;_driveFileId=null;
   _driveConnected=false;_driveAccountEmail=null;_driveLastSyncedAt=null;
+  _updateRoleFromEmail(); // no email known anymore -> fail-safe (viewer, unless ADMIN_EMAILS is empty)
   try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
   clearTimeout(_driveSyncTimer);
   _driveSetStatus('','Disconnected. Your data stays safe in this browser (IndexedDB) but will no longer sync to Drive.');
@@ -4234,6 +4346,7 @@ async function driveTryAutoReconnect(){
   try{
     await _driveRequestToken(true);
     await _driveFetchAccountEmail();
+    _updateRoleFromEmail();
     _driveConnected=true;
     await _driveFindOrCreateFileAndHydrate();
     _driveSetStatus('ok','');
@@ -4263,6 +4376,13 @@ async function _driveFindFile(){
   const r=await _driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)`);
   const j=await r.json();
   return (j.files&&j.files[0])?j.files[0]:null;
+}
+
+// Confirms a fixed file ID (see DRIVE_SHARED_FILE_ID) is reachable with the
+// current token — i.e. the signed-in account has at least Viewer access.
+async function _driveGetFileMeta(fileId){
+  const r=await _driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,modifiedTime`);
+  return r.json();
 }
 
 async function _driveDownloadFile(fileId){
@@ -4298,12 +4418,25 @@ async function _driveUpdateFile(fileId,payload){
 // and replaces local IndexedDB entirely. If Drive has nothing yet, the
 // current local library (if any) is uploaded to seed it.
 async function _driveFindOrCreateFileAndHydrate(){
+  // Shared-library mode: everyone (admin or test user) reads this exact
+  // file. Non-admins never reach the "create" branch below — if the file
+  // isn't reachable for them, that's a permissions problem to fix in Drive
+  // sharing, not something this app should silently paper over by making
+  // them a brand new empty file.
+  if(DRIVE_SHARED_FILE_ID){
+    await _driveGetFileMeta(DRIVE_SHARED_FILE_ID); // throws if not accessible
+    _driveFileId=DRIVE_SHARED_FILE_ID;
+    const payload=await _driveDownloadFile(DRIVE_SHARED_FILE_ID);
+    await _driveHydrateFromPayload(payload);
+    _driveLastSyncedAt=new Date();
+    return;
+  }
   const existing=await _driveFindFile();
   if(existing){
     _driveFileId=existing.id;
     const payload=await _driveDownloadFile(existing.id);
     await _driveHydrateFromPayload(payload);
-  } else {
+  } else if(_isAdmin){
     const payload=await buildLibraryPayload();
     _driveFileId=await _driveCreateFile(payload);
   }
@@ -4358,6 +4491,11 @@ async function buildLibraryPayload(){
 // Pass `immediate=true` for the manual "Sync now" button.
 function scheduleDriveSync(immediate){
   if(!_driveConnected||_driveHydrating)return;
+  // Non-admins (in shared-library mode) only have read access to the
+  // library file — quietly skip the push instead of spamming failed API
+  // calls. Their own local IndexedDB cache (e.g. their quiz attempts)
+  // still works fine; it just isn't the thing being synced to Drive here.
+  if(!_isAdmin && DRIVE_SHARED_FILE_ID)return;
   clearTimeout(_driveSyncTimer);
   if(immediate){_drivePushToDrive();return;}
   _driveSyncTimer=setTimeout(_drivePushToDrive,DRIVE_SYNC_DEBOUNCE_MS);
@@ -5202,33 +5340,37 @@ function _buildFormCard(f, _attByForm){
   else{const sp=document.createElement('span');sp.className='js-no-attempts';sp.textContent='No attempts yet';attDiv.appendChild(sp);}
   const actDiv=card.querySelector('.form-card-actions');
   actDiv.addEventListener('click',e=>e.stopPropagation());
-  const editBtn=document.createElement('button');editBtn.className='fc-action edit-btn';
+  const editBtn=document.createElement('button');editBtn.className='fc-action edit-btn admin-only';
   editBtn.style.cssText=`border-color:${c}22;color:${c};background:${c}15`;
   editBtn.textContent='✏ Edit';
   editBtn.addEventListener('mouseenter',()=>{editBtn.style.background=c;editBtn.style.color='#fff';editBtn.style.borderColor=c;});
   editBtn.addEventListener('mouseleave',()=>{editBtn.style.background=c+'15';editBtn.style.color=c;editBtn.style.borderColor=c+'22';});
   editBtn.addEventListener('click',()=>{ _folderViewOrigin=_folderViewId; openForm(f.id); });
   const testBtn=document.createElement('button');testBtn.className='fc-action test-btn';testBtn.textContent='▶ Test';testBtn.addEventListener('click',()=>{ _folderViewOrigin=_folderViewId; testForm(f.id); });
-  const dupBtn=document.createElement('button');dupBtn.className='fc-action';dupBtn.textContent='⧉ Duplicate';dupBtn.addEventListener('click',()=>duplicateForm(f.id));
+  const dupBtn=document.createElement('button');dupBtn.className='fc-action admin-only';dupBtn.textContent='⧉ Duplicate';dupBtn.addEventListener('click',()=>duplicateForm(f.id));
   const histBtn=document.createElement('button');histBtn.className='fc-action';histBtn.textContent='⏱ History';histBtn.addEventListener('click',e=>{e.stopPropagation();viewFormAttempts(f.id);});
-  const expBtn=document.createElement('button');expBtn.className='fc-action export-btn';expBtn.textContent='↓ Export';expBtn.title='Export this quiz as .json';expBtn.setAttribute('aria-label','Export '+f.title+' as JSON');expBtn.addEventListener('click',()=>exportSingleForm(f.id));
-  const shareBtn=document.createElement('button');shareBtn.className='fc-action js-share-btn';shareBtn.textContent='↗ Share';shareBtn.title='Share or export this form';shareBtn.setAttribute('aria-label','Share or export '+f.title);shareBtn.addEventListener('click',e=>{e.stopPropagation();openShareModal(f.id);});
+  const expBtn=document.createElement('button');expBtn.className='fc-action export-btn admin-only';expBtn.textContent='↓ Export';expBtn.title='Export this quiz as .json';expBtn.setAttribute('aria-label','Export '+f.title+' as JSON');expBtn.addEventListener('click',()=>exportSingleForm(f.id));
+  const shareBtn=document.createElement('button');shareBtn.className='fc-action js-share-btn admin-only';shareBtn.textContent='↗ Share';shareBtn.title='Share or export this form';shareBtn.setAttribute('aria-label','Share or export '+f.title);shareBtn.addEventListener('click',e=>{e.stopPropagation();openShareModal(f.id);});
   // ── Group picker button ──────────────────────────────────────────────────────
-  const grpBtn=document.createElement('button');grpBtn.className='fc-action';
+  const grpBtn=document.createElement('button');grpBtn.className='fc-action admin-only';
   const assignedGrp=STATE.groups.find(g=>g.id===f.group);
   grpBtn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${assignedGrp?assignedGrp.color:'#9e99b8'};margin-right:3px;flex-shrink:0"></span>${assignedGrp?'Group: '+assignedGrp.name:'+ Group'}`;
   grpBtn.title='Move to a group';
   grpBtn.addEventListener('click',e=>{e.stopPropagation();_openGroupPicker(f.id,grpBtn);});
-  const delBtn=document.createElement('button');delBtn.className='fc-action danger';delBtn.textContent='🗑 Delete';delBtn.addEventListener('click',()=>deleteForm(f.id));
+  const delBtn=document.createElement('button');delBtn.className='fc-action danger admin-only';delBtn.textContent='🗑 Delete';delBtn.addEventListener('click',()=>deleteForm(f.id));
   actDiv.append(editBtn,testBtn,dupBtn,histBtn,expBtn,shareBtn,grpBtn,delBtn);
-  card.addEventListener('click',e=>{if(!actDiv.contains(e.target)){ _folderViewOrigin=_folderViewId; openForm(f.id);}});
+  card.addEventListener('click',e=>{
+    if(actDiv.contains(e.target))return;
+    _folderViewOrigin=_folderViewId;
+    if(_isAdmin)openForm(f.id); else testForm(f.id);
+  });
   card.addEventListener('touchend',e=>{
     if(actDiv.contains(e.target))return;
     if(!card.classList.contains('touch-open')){
       e.preventDefault();
       document.querySelectorAll('.form-card.touch-open').forEach(c2=>{if(c2!==card)c2.classList.remove('touch-open');});
       card.classList.add('touch-open');
-    } else { _folderViewOrigin=_folderViewId; openForm(f.id); }
+    } else { _folderViewOrigin=_folderViewId; if(_isAdmin)openForm(f.id); else testForm(f.id); }
   },{passive:false});
   return card;
 }
@@ -5261,39 +5403,42 @@ function renderDashboard(){
     _setSafeInnerHTML(emp,`
       <div class="dash-empty-icon">📋</div>
       <h3>No forms yet</h3>
-      <p>Click &ldquo;New Form&rdquo; to create your first quiz or form.</p>
-      <div class="dash-empty-divider"><span>or start from a template</span></div>
-      <div class="dash-tpl-grid">
-        <button class="dash-tpl-card" onclick="createFromTemplate('quiz')" title="Multiple choice quiz with scoring">
-          <div class="dash-tpl-icon">🎯</div>
-          <div class="dash-tpl-name">Graded Quiz</div>
-          <div class="dash-tpl-desc">Multiple choice with auto-scoring</div>
-        </button>
-        <button class="dash-tpl-card" onclick="createFromTemplate('truefalse')" title="True / False quiz">
-          <div class="dash-tpl-icon">✓✗</div>
-          <div class="dash-tpl-name">True / False</div>
-          <div class="dash-tpl-desc">Quick binary-answer assessment</div>
-        </button>
-        <button class="dash-tpl-card" onclick="createFromTemplate('survey')" title="Open-ended feedback form">
-          <div class="dash-tpl-icon">📝</div>
-          <div class="dash-tpl-name">Survey / Form</div>
-          <div class="dash-tpl-desc">Open-ended questions, no scoring</div>
-        </button>
-        <button class="dash-tpl-card" onclick="createFromTemplate('translation')" title="Language translation practice">
-          <div class="dash-tpl-icon">🌐</div>
-          <div class="dash-tpl-name">Translation</div>
-          <div class="dash-tpl-desc">Sentence translation practice set</div>
-        </button>
-        <button class="dash-tpl-card" onclick="createFromTemplate('matching')" title="Matching pairs quiz">
-          <div class="dash-tpl-icon">⇌</div>
-          <div class="dash-tpl-name">Matching</div>
-          <div class="dash-tpl-desc">Match terms to details</div>
-        </button>
-        <button class="dash-tpl-card" onclick="createFromTemplate('blank')" title="Start from scratch">
-          <div class="dash-tpl-icon">＋</div>
-          <div class="dash-tpl-name">Blank</div>
-          <div class="dash-tpl-desc">Start from an empty canvas</div>
-        </button>
+      <p class="admin-only">Click &ldquo;New Form&rdquo; to create your first quiz or form.</p>
+      <p class="role-viewer-only">There's nothing here to test yet — check back once the admin has published a quiz.</p>
+      <div class="admin-only">
+        <div class="dash-empty-divider"><span>or start from a template</span></div>
+        <div class="dash-tpl-grid">
+          <button class="dash-tpl-card" onclick="createFromTemplate('quiz')" title="Multiple choice quiz with scoring">
+            <div class="dash-tpl-icon">🎯</div>
+            <div class="dash-tpl-name">Graded Quiz</div>
+            <div class="dash-tpl-desc">Multiple choice with auto-scoring</div>
+          </button>
+          <button class="dash-tpl-card" onclick="createFromTemplate('truefalse')" title="True / False quiz">
+            <div class="dash-tpl-icon">✓✗</div>
+            <div class="dash-tpl-name">True / False</div>
+            <div class="dash-tpl-desc">Quick binary-answer assessment</div>
+          </button>
+          <button class="dash-tpl-card" onclick="createFromTemplate('survey')" title="Open-ended feedback form">
+            <div class="dash-tpl-icon">📝</div>
+            <div class="dash-tpl-name">Survey / Form</div>
+            <div class="dash-tpl-desc">Open-ended questions, no scoring</div>
+          </button>
+          <button class="dash-tpl-card" onclick="createFromTemplate('translation')" title="Language translation practice">
+            <div class="dash-tpl-icon">🌐</div>
+            <div class="dash-tpl-name">Translation</div>
+            <div class="dash-tpl-desc">Sentence translation practice set</div>
+          </button>
+          <button class="dash-tpl-card" onclick="createFromTemplate('matching')" title="Matching pairs quiz">
+            <div class="dash-tpl-icon">⇌</div>
+            <div class="dash-tpl-name">Matching</div>
+            <div class="dash-tpl-desc">Match terms to details</div>
+          </button>
+          <button class="dash-tpl-card" onclick="createFromTemplate('blank')" title="Start from scratch">
+            <div class="dash-tpl-icon">＋</div>
+            <div class="dash-tpl-name">Blank</div>
+            <div class="dash-tpl-desc">Start from an empty canvas</div>
+          </button>
+        </div>
       </div>`);
     grid.appendChild(emp);return;
   }
@@ -5688,7 +5833,7 @@ function _renderFolderBreadcrumb(g, formCount){
   viewToggle.append(gridBtn, listBtn);
 
   const newBtn=document.createElement('button');
-  newBtn.className='btn-new-form';
+  newBtn.className='btn-new-form admin-only';
   _setSafeInnerHTML(newBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New Form');
   newBtn.addEventListener('click', createNewForm);
 
@@ -5727,21 +5872,21 @@ function _restoreRootDashHeader(){
   attBtn.addEventListener('click', openAttemptsModal);
 
   const grpBtn=document.createElement('button');
-  grpBtn.className='btn-attempts';
+  grpBtn.className='btn-attempts admin-only';
   grpBtn.style.cssText='background:#f3e8ff;color:#5c35b1;border-color:#d4b8f7;font-weight:600';
   grpBtn.title='Organise forms into groups';
   _setSafeInnerHTML(grpBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="2" y="3" width="20" height="5" rx="1.5"/><rect x="2" y="10" width="20" height="5" rx="1.5"/><rect x="2" y="17" width="20" height="5" rx="1.5"/></svg> Groups');
   grpBtn.addEventListener('click', openGroupsModal);
 
   const libBtn=document.createElement('button');
-  libBtn.className='btn-attempts';
+  libBtn.className='btn-attempts admin-only';
   libBtn.style.cssText='background:#fff3e0;color:#e65100;border-color:#ffcc80;font-weight:600';
   libBtn.title='Export or Import your entire quiz library';
   _setSafeInnerHTML(libBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Export / Import');
   libBtn.addEventListener('click', openLibModal);
 
   const newBtn=document.createElement('button');
-  newBtn.className='btn-new-form';
+  newBtn.className='btn-new-form admin-only';
   _setSafeInnerHTML(newBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New Form');
   newBtn.addEventListener('click', createNewForm);
 
@@ -5898,6 +6043,7 @@ function setFormColor(id,c){const f=forms.find(x=>x.id===id);if(!f)return;f.colo
 // Form lifecycle: create, open, duplicate, delete, save, go back.
 // Also owns title/desc sync and the theme + mode grids.
 function createNewForm(){
+  if(!_isAdmin){showShortcutToast('Only the admin can create forms.');return;}
   const groupId=_folderViewId||null; // auto-assign if currently inside a folder
   const f={id:_allocFormId(),title:'Untitled Form',desc:'',mode:'radio',questionCount:0,color:COLOR_THEMES[forms.length%COLOR_THEMES.length].hex,createdAt:Date.now(),updatedAt:Date.now(),group:groupId||undefined};
   if(groupId) f.group=groupId;
@@ -5956,6 +6102,7 @@ const TEMPLATES={
 };
 
 function createFromTemplate(key){
+  if(!_isAdmin){showShortcutToast('Only the admin can create forms.');return;}
   const tpl=TEMPLATES[key];if(!tpl)return;
   const f={
     id:_allocFormId(),
@@ -6030,7 +6177,9 @@ function openForm(id){
   // fire and clobber the real draft we haven't even looked up yet.
   _debouncedSavePreviewDraft.cancel();
   document.getElementById('form-title').value=f.title||'';
+  document.getElementById('form-title').readOnly=!_isAdmin;
   document.getElementById('form-desc').value=f.desc||'';
+  document.getElementById('form-desc').readOnly=!_isAdmin;
   const stripe=document.getElementById('hdr-stripe');if(stripe)stripe.style.background=f.color||'var(--purple)';
   document.documentElement.style.setProperty('--form-accent',f.color||'#5c35b1');
   document.getElementById('dashboard-view').style.display='none';
@@ -6044,7 +6193,7 @@ function openForm(id){
   })();
   (function(){
     const tr=document.getElementById('topbar-right');tr.innerHTML='';
-    const urWrap=document.createElement('div');urWrap.className='btn-undo-redo';urWrap.id='undo-redo-wrap';urWrap.title='Undo (Ctrl+Z) / Redo (Ctrl+Y)';
+    const urWrap=document.createElement('div');urWrap.className='btn-undo-redo admin-only';urWrap.id='undo-redo-wrap';urWrap.title='Undo (Ctrl+Z) / Redo (Ctrl+Y)';
     const uBtn=document.createElement('button');uBtn.className='btn-ur';uBtn.id='btn-undo';uBtn.title='Undo (Ctrl+Z)';uBtn.disabled=true;
     _setSafeInnerHTML(uBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h11a5 5 0 010 10H9"/><polyline points="3 10 7 6 3 2"/></svg><span class="ur-count" id="undo-count" style="display:none">0</span>');
     uBtn.addEventListener('click',performUndo);
@@ -6052,18 +6201,18 @@ function openForm(id){
     _setSafeInnerHTML(rBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10H10a5 5 0 000 10h5"/><polyline points="21 10 17 6 21 2"/></svg><span class="ur-count" id="redo-count" style="display:none">0</span>');
     rBtn.addEventListener('click',performRedo);
     urWrap.append(uBtn,rBtn);
-    const badge=document.createElement('div');badge.className='autosave-badge';
+    const badge=document.createElement('div');badge.className='autosave-badge admin-only';badge.id='autosave-badge';
     const dot=document.createElement('div');dot.className='autosave-dot';dot.id='autosave-dot';
     const savedSpan=document.createElement('span');savedSpan.textContent='Saved';
     badge.append(dot,savedSpan);
-    const backBtn=document.createElement('button');backBtn.className='back-btn';backBtn.textContent='← All Forms';backBtn.addEventListener('click',saveAndGoBack);
-    const saveBtn=document.createElement('button');saveBtn.className='btn-white';saveBtn.textContent='Save & Exit';saveBtn.addEventListener('click',saveAndGoBack);
-    const prevBtn=document.createElement('button');prevBtn.className='btn-outline';prevBtn.textContent='Preview';prevBtn.addEventListener('click',()=>switchTab('preview'));
+    const backBtn=document.createElement('button');backBtn.className='back-btn';backBtn.textContent=_isAdmin?'← All Forms':'← Back';backBtn.addEventListener('click',saveAndGoBack);
+    const saveBtn=document.createElement('button');saveBtn.className='btn-white admin-only';saveBtn.textContent='Save & Exit';saveBtn.addEventListener('click',saveAndGoBack);
+    const prevBtn=document.createElement('button');prevBtn.className='btn-outline admin-only';prevBtn.textContent='Preview';prevBtn.addEventListener('click',()=>switchTab('preview'));
     const printBtn=document.createElement('button');printBtn.className='btn-outline';printBtn.title='Print quiz as PDF (all pages)';_setSafeInnerHTML(printBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print');printBtn.addEventListener('click',printQuiz);
-    const rescoreBtn=document.createElement('button');rescoreBtn.className='btn-outline';rescoreBtn.title='Re-grade every saved attempt for this form against the current answer key';_setSafeInnerHTML(rescoreBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Rescore');rescoreBtn.addEventListener('click',manualRescoreForm);
+    const rescoreBtn=document.createElement('button');rescoreBtn.className='btn-outline admin-only';rescoreBtn.title='Re-grade every saved attempt for this form against the current answer key';_setSafeInnerHTML(rescoreBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Rescore');rescoreBtn.addEventListener('click',manualRescoreForm);
     tr.append(urWrap,badge,backBtn,saveBtn,prevBtn,printBtn,rescoreBtn);
   })();
-  switchTab('questions');renderModeGrid();renderThemeGrid();initTimerUI();initRandomizeUI();
+  switchTab(_isAdmin?'questions':'preview');renderModeGrid();renderThemeGrid();initTimerUI();initRandomizeUI();
   clearHistory();
   const list=document.getElementById('questions-list');
   _setSafeInnerHTML(list,'<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading questions…</p></div>');
@@ -6115,7 +6264,7 @@ function saveAndGoBack(){
     histBtn.appendChild(document.createTextNode('History'));
     const cntBadge=document.createElement('span');cntBadge.className='attempts-count-badge';cntBadge.id='topbar-attempts-count';cntBadge.style.display='none';cntBadge.textContent='0';
     histBtn.appendChild(cntBadge);histBtn.addEventListener('click',openAttemptsModal);
-    const newBtn=document.createElement('button');newBtn.className='btn-new-form js-topbar-new-btn';newBtn.id='topbar-new-btn';
+    const newBtn=document.createElement('button');newBtn.className='btn-new-form js-topbar-new-btn admin-only';newBtn.id='topbar-new-btn';
     _setSafeInnerHTML(newBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>');
     newBtn.appendChild(document.createTextNode('New Form'));newBtn.addEventListener('click',createNewForm);
     tr.append(histBtn,newBtn);
@@ -6131,6 +6280,7 @@ function saveAndGoBack(){
   updateAttemptsCounts();renderDashboard();
 }
 function duplicateForm(id){
+  if(!_isAdmin){showShortcutToast('Only the admin can duplicate forms.');return;}
   const f=forms.find(x=>x.id===id);if(!f)return;
   const newId=_allocFormId();
   const c=JSON.parse(JSON.stringify(f));
@@ -6142,7 +6292,7 @@ function duplicateForm(id){
   }).catch(()=>{persistFormById(newId);renderDashboard();});
 }
 function testForm(id){return openForm(id).then(()=>switchTab('preview')).catch(()=>switchTab('preview'));}
-async function deleteForm(id){if(!await _confirmModal('Delete this form?\n\nAll questions will be permanently removed.','Delete','Cancel'))return;setState({forms:forms.filter(x=>x.id!==id)});deleteQuestions(id);dbDeleteOne(STORE_FORMS,id).catch(()=>{});renderDashboard();}
+async function deleteForm(id){if(!_isAdmin){showShortcutToast('Only the admin can delete forms.');return;}if(!await _confirmModal('Delete this form?\n\nAll questions will be permanently removed.','Delete','Cancel'))return;setState({forms:forms.filter(x=>x.id!==id)});deleteQuestions(id);dbDeleteOne(STORE_FORMS,id).catch(()=>{});renderDashboard();}
 function syncTitle(){
   const t=document.getElementById('form-title').value;
   const f=forms.find(x=>x.id===currentFormId);
@@ -6247,6 +6397,7 @@ function printQuiz(){
 }
 
 function switchTab(tab){
+  if(tab==='questions' && !_isAdmin) tab='preview'; // viewers/test users are read-only — no editing tab for them
   const wasOnPreview = document.getElementById('preview-tab').style.display==='block';
   document.getElementById('questions-tab').style.display=tab==='questions'?'block':'none';
   document.getElementById('preview-tab').style.display=tab==='preview'?'block':'none';
@@ -8726,6 +8877,7 @@ setTimeout(()=>{
 // and pull the latest library, re-rendering once it lands. This never
 // blocks the initial paint.
 _driveRenderModalUI();
+_applyRoleToUI(); // fail-safe default (viewer, if ADMIN_EMAILS is set) until Drive reconnect proves otherwise
 setTimeout(()=>{ driveTryAutoReconnect(); },300);
 
 // TOC panel — previously an inline <script> in index.html; moved here so that
