@@ -5590,6 +5590,12 @@ function getSortedForms(){
 //   so saveAndGoBack() can return to the folder view instead of root.
 let _folderViewId     = null;   // replaces the old _openFolderId drawer model
 let _folderViewOrigin = null;   // groupId of the folder the user was in when they opened the builder, or null
+// Tracks the in-flight loadQuestions() promise for whichever form openForm()
+// most recently opened. _enterPreviewTab() awaits this before building
+// preview pages / starting the timer, so it never runs against a stale or
+// empty `items` list — see the BUG FIX comment in openForm() for the full
+// story of why this exists.
+let _formItemsLoadPromise = Promise.resolve();
 let _folderViewMode   = 'grid'; // 'grid' | 'list' — persisted to localStorage
 
 // Legacy alias — kept so any internal calls to the old name still work.
@@ -6753,11 +6759,42 @@ function openForm(id){
     const rescoreBtn=document.createElement('button');rescoreBtn.className='btn-outline admin-only';rescoreBtn.title='Re-grade every saved attempt for this form against the current answer key';_setSafeInnerHTML(rescoreBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Rescore');rescoreBtn.addEventListener('click',manualRescoreForm);
     tr.append(urWrap,badge,backBtn,saveBtn,prevBtn,printBtn,rescoreBtn);
   })();
-  switchTab(_isAdmin?'questions':'preview');renderModeGrid();renderThemeGrid();initTimerUI();initRandomizeUI();
+  renderModeGrid();renderThemeGrid();initTimerUI();initRandomizeUI();
   clearHistory();
   const list=document.getElementById('questions-list');
   _setSafeInnerHTML(list,'<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading questions…</p></div>');
-  return loadQuestions(id).then(loadedItems=>{
+  // BUG FIX (timer stuck at full duration for non-admin/test-mode users):
+  // switchTab() below, for non-admins, calls switchTab('preview') — which
+  // fires _enterPreviewTab() SYNCHRONOUSLY (it's an async function, but it
+  // starts running immediately, up to its first `await`) before
+  // loadQuestions(id) has resolved. _enterPreviewTab() used to go straight
+  // into building preview pages and calling startPreviewTimer() against
+  // whatever `items` happened to already be in STATE at that moment —
+  // stale/empty, since this form's real questions hadn't loaded yet.
+  // renderPreview() bails out early whenever `items` is empty, so the
+  // #preview-timer-display element it would normally create never got
+  // created — leaving the just-started countdown with no DOM element for
+  // its setInterval tick to update.
+  //
+  // On top of that, testForm() does `openForm(id).then(()=>switchTab('preview'))`
+  // — a SECOND switchTab('preview') call that fires once loadQuestions below
+  // finally resolves. By then the tab's display was already 'block' (set
+  // synchronously by the first call), so switchTab() took its "already on
+  // preview, just re-render" shortcut instead of re-running
+  // _enterPreviewTab() — meaning the timer was never (re)started with the
+  // now-correct item list either. Net effect: students saw a countdown
+  // frozen at the full configured duration that never ticked down.
+  //
+  // Fix: give _enterPreviewTab() a promise it can await so its "start a
+  // fresh attempt" logic (buildPreviewPages/startPreviewTimer/renderPreview)
+  // never runs until this form's real questions are actually in STATE —
+  // regardless of which of the two switchTab('preview') calls above ends up
+  // triggering it. Crucially, this assignment happens BEFORE switchTab() is
+  // called below, so _enterPreviewTab() (which can start running
+  // synchronously as a side effect of that call) always reads the
+  // up-to-date promise for *this* form instead of a stale one left over
+  // from whatever form was open before.
+  _formItemsLoadPromise = loadQuestions(id).then(loadedItems=>{
     setState({
       items:  loadedItems,
       nextId: Math.max(1,...loadedItems.map(it=>it.id+1),1),
@@ -6769,6 +6806,8 @@ function openForm(id){
     renderBuilder();
     updateUndoRedoUI();
   });
+  switchTab(_isAdmin?'questions':'preview');
+  return _formItemsLoadPromise;
 }
 
 function saveCurrentForm(){
@@ -6832,7 +6871,21 @@ function duplicateForm(id){
     persistFormById(newId);renderDashboard();
   }).catch(()=>{persistFormById(newId);renderDashboard();});
 }
-function testForm(id){return openForm(id).then(()=>switchTab('preview')).catch(()=>switchTab('preview'));}
+function testForm(id){
+  // BUG FIX (timer stuck at full duration for non-admin/test-mode users):
+  // this used to unconditionally call switchTab('preview') here after
+  // openForm() resolved. But openForm() already calls
+  // switchTab(_isAdmin?'questions':'preview') itself — so for non-admins,
+  // that was a SECOND switchTab('preview') call on top of the one openForm()
+  // already made. Since the tab's display was already flipped to 'block' by
+  // the first call, this second call hit switchTab()'s "already on preview"
+  // shortcut (just re-render, no re-entry) instead of properly (re)running
+  // the Preview entry logic — which is what actually starts the countdown.
+  // Only admins need this: openForm() puts admins on 'questions' and this
+  // is what actually moves them over to 'preview' for Test mode.
+  const goToPreview=()=>{ if(_isAdmin) switchTab('preview'); };
+  return openForm(id).then(goToPreview).catch(goToPreview);
+}
 async function deleteForm(id){if(!_isAdmin){showShortcutToast('Only the admin can delete forms.');return;}if(!await _confirmModal('Delete this form?\n\nAll questions will be permanently removed.','Delete','Cancel'))return;setState({forms:forms.filter(x=>x.id!==id)});deleteQuestions(id);dbDeleteOne(STORE_FORMS,id).catch(()=>{});renderDashboard();}
 function syncTitle(){
   const t=document.getElementById('form-title').value;
@@ -8338,6 +8391,13 @@ async function _enterPreviewTab(){
   // like a premature reset, even when nothing has actually been touched yet.
   const _wrap=document.getElementById('preview-content');
   if(_wrap) _wrap.innerHTML='<div class="empty-state"><p>Loading your quiz…</p></div>';
+  // Wait for this form's questions to actually be loaded into `items` before
+  // doing anything below (draft check, buildPreviewPages, startPreviewTimer).
+  // Without this, entering Preview immediately after opening a form (as
+  // happens for non-admin/test-mode users, who land on Preview as soon as
+  // openForm() runs) could start the countdown and try to render against an
+  // empty/stale `items` list — see the BUG FIX comment in openForm().
+  await _formItemsLoadPromise;
   const draft = await _loadPreviewDraft(currentFormId);
   if(draft){
     const savedWhen = new Date(draft.savedAt).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
