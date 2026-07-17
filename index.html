@@ -4085,8 +4085,14 @@ const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-r
 // ALL, while ADMIN_EMAILS controls who, among those signed-in people, gets
 // editing rights versus read-only "take the quiz" access.
 //   - Matching is case-insensitive.
-//   - Leave the array empty to disable role checking entirely — every
-//     account that can sign in is treated as admin (the original behavior).
+//   - ⚠️ THIS ARRAY IS CURRENTLY EMPTY. That disables role checking
+//     entirely — EVERY Google account that signs in (including a "test"
+//     account you connect after disconnecting the admin one) is treated as
+//     admin, with full edit/delete rights. This is what makes it look like
+//     "the non-admin becomes admin after the admin disconnects" — there is
+//     no bug there, there's just no admin configured yet. Add your real
+//     email(s) below to turn on the admin/viewer split. A banner and a
+//     console warning both remind you of this until you do.
 //   - Everyone else who is signed in can still connect Drive and take any
 //     published quiz; every editing control is hidden and blocked for them.
 const ADMIN_EMAILS = [
@@ -4301,9 +4307,23 @@ async function _driveGetValidToken(){
 async function driveConnect(){
   const btn=document.getElementById('drive-connect-btn');
   if(btn)btn.disabled=true;
+  // Pessimistic reset: never trust whatever role/email was left over from a
+  // previous account in this tab. Until the NEW account's email is fetched
+  // and checked against ADMIN_EMAILS below, treat this session as a
+  // non-admin (fail-safe if ADMIN_EMAILS is configured). This closes the gap
+  // where a slow/failed email lookup could otherwise leave a prior admin
+  // session's role flag in place for a different, just-connected account.
+  _driveAccountEmail=null;
+  _updateRoleFromEmail();
   try{
     await _driveRequestToken(false);
     await _driveFetchAccountEmail();
+    if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
+      // Couldn't verify who this is — do NOT proceed treating them as
+      // whatever the previous role happened to be. Fail safe as a viewer
+      // and stop, rather than connecting Drive under an unknown identity.
+      throw new Error('Could not verify your Google account email, so admin access was not granted. Please try connecting again.');
+    }
     _updateRoleFromEmail();
     _driveConnected=true;
     try{localStorage.setItem(DRIVE_TOKEN_LS_KEY,'1');}catch(_){}
@@ -4372,6 +4392,9 @@ async function driveTryAutoReconnect(){
   try{
     await _driveRequestToken(true);
     await _driveFetchAccountEmail();
+    if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
+      throw new Error('Could not verify Google account email on silent reconnect.');
+    }
     _updateRoleFromEmail();
     _driveConnected=true;
     await _driveFindOrCreateFileAndHydrate();
@@ -4379,6 +4402,8 @@ async function driveTryAutoReconnect(){
   }catch(e){
     console.warn('[drive] silent reconnect failed (will need manual reconnect):',e);
     _driveConnected=false;
+    _driveAccountEmail=null;
+    _updateRoleFromEmail(); // fail safe back to viewer rather than leaving a stale admin flag set
     _driveSetStatus('err','Signed out of Drive — reconnect from Export / Import → Google Drive.');
   }
   _driveRenderModalUI();
@@ -8905,6 +8930,29 @@ setTimeout(()=>{
 _driveRenderModalUI();
 _applyRoleToUI(); // fail-safe default (viewer, if ADMIN_EMAILS is set) until Drive reconnect proves otherwise
 setTimeout(()=>{ driveTryAutoReconnect(); },300);
+
+// ── ADMIN_EMAILS misconfiguration guard ─────────────────────────────────────
+// If ADMIN_EMAILS is left empty, role-checking is intentionally OFF and the
+// code treats EVERY signed-in Google account as admin (see the comment above
+// the ADMIN_EMAILS declaration, §ROLE). This is easy to miss and looks
+// exactly like a privilege-escalation bug from the outside: connect as
+// "admin", disconnect, connect as a different account, and that account
+// also gets full edit rights — because nothing was ever configured to tell
+// the app who the real admin is. Surface this loudly instead of silently.
+if(ADMIN_EMAILS.length===0){
+  console.warn('[QuizBuilder] ADMIN_EMAILS is empty — role separation is DISABLED and every Google account that connects will be treated as admin. Add at least one email to ADMIN_EMAILS near the top of the script to restrict editing to specific accounts.');
+  document.addEventListener('DOMContentLoaded',_showAdminEmailsWarningBanner);
+  if(document.readyState==='complete'||document.readyState==='interactive')_showAdminEmailsWarningBanner();
+}
+function _showAdminEmailsWarningBanner(){
+  if(document.getElementById('admin-emails-warning-banner'))return;
+  const bar=document.createElement('div');
+  bar.id='admin-emails-warning-banner';
+  bar.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#3d2c00;color:#ffe082;font:500 12px/1.5 "DM Sans",sans-serif;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;box-shadow:0 -2px 10px rgba(0,0,0,.25)';
+  bar.innerHTML='⚠️ <span>Role separation is off: <code style="background:rgba(255,255,255,.12);padding:1px 5px;border-radius:4px">ADMIN_EMAILS</code> is empty, so every signed-in account is treated as admin.</span>'
+    +'<button type="button" style="background:#ffca28;color:#3d2c00;border:none;border-radius:4px;font:600 11px/1 inherit;padding:5px 10px;cursor:pointer" onclick="this.parentElement.remove()">Dismiss</button>';
+  document.body.appendChild(bar);
+}
 
 // TOC panel — previously an inline <script> in index.html; moved here so that
 // script-src 'unsafe-inline' can be removed from the Content-Security-Policy.
