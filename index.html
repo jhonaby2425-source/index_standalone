@@ -4224,6 +4224,7 @@ const ADMIN_EMAILS = [
 //      level too, not just in this app's UI.
 const DRIVE_SHARED_FILE_ID = '1e7L-57jQi_yThwbm2ToXhEDAjP21ZcVE';
 
+
 let _driveTokenClient=null;
 let _driveAccessToken=null;
 let _driveTokenExpiresAt=0;
@@ -4419,7 +4420,15 @@ async function _shareGateOpenPendingForm(){
   }
   _shareGateSetStatus('ok','Signed in ✓ Opening quiz…');
   _folderViewOrigin=null;
-  await openForm(id);
+  // Admins land in the editor (openForm); everyone else must go through
+  // testForm(), which re-renders the Preview tab AFTER loadQuestions()
+  // resolves. openForm() alone switches to the Preview tab immediately
+  // (before questions are loaded) and only re-renders the *editor* list
+  // (renderBuilder()) once loading finishes — so a test user opening a
+  // shared quiz link would land on an empty/stuck "Preview" screen that
+  // never populates with their questions. This is what made the test
+  // screen look broken / stuck in the admin's edit-mode rendering path.
+  if(_isAdmin) await openForm(id); else await testForm(id);
   _hideShareGate();
 }
 
@@ -6225,14 +6234,19 @@ function _buildFolderListRow(f, _attByForm){
 
   row.append(nameCell, typeCell, qCell, scoreCell, dateCell, actCell);
 
-  // Row click → open form (but not on kebab)
+  // Row click → open form (but not on kebab).
+  // Non-admins must never land in the builder/edit view — route them to the
+  // read-only test-taking flow instead, same as the card-grid view does.
   row.addEventListener('click', e=>{
     if(actCell.contains(e.target)) return;
     _folderViewOrigin=_folderViewId;
-    openForm(f.id);
+    if(_isAdmin) openForm(f.id); else testForm(f.id);
   });
   row.addEventListener('keydown', e=>{
-    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); _folderViewOrigin=_folderViewId; openForm(f.id); }
+    if(e.key==='Enter'||e.key===' '){
+      e.preventDefault(); _folderViewOrigin=_folderViewId;
+      if(_isAdmin) openForm(f.id); else testForm(f.id);
+    }
   });
 
   return row;
@@ -6244,7 +6258,12 @@ function _openFolderRowMenu(e, f, anchor){
   const menu=document.createElement('div');
   menu.className='flist-row-menu';
 
-  const items=[
+  // Non-admins (test users) only ever get read-only actions here — Edit,
+  // Duplicate, Share, Export, +Group and Delete all mutate the quiz library,
+  // so they're hidden the same way the card-grid view hides them via
+  // .admin-only. This is what was letting a signed-in test user land in the
+  // full builder/edit screen from the folder list view.
+  const items=_isAdmin ? [
     { label:'✏ Edit',        fn:()=>{ _folderViewOrigin=_folderViewId; openForm(f.id); } },
     { label:'▶ Test',        fn:()=>{ _folderViewOrigin=_folderViewId; testForm(f.id); } },
     { label:'⧉ Duplicate',   fn:()=>duplicateForm(f.id) },
@@ -6253,6 +6272,9 @@ function _openFolderRowMenu(e, f, anchor){
     { label:'↓ Export',      fn:()=>exportSingleForm(f.id) },
     { label:'+ Group',       fn:()=>_openGroupPicker(f.id, anchor) },
     { label:'🗑 Delete', danger:true, fn:()=>deleteForm(f.id) },
+  ] : [
+    { label:'▶ Test',        fn:()=>{ _folderViewOrigin=_folderViewId; testForm(f.id); } },
+    { label:'⏱ History',    fn:()=>viewFormAttempts(f.id) },
   ];
 
   items.forEach(item=>{
@@ -8384,6 +8406,22 @@ async function _enterPreviewTab(){
  */
 async function pausePreview(){
   if(!currentFormId || previewSubmitted) return;
+  // BUG FIX 4 (timer not stopping in non-admin/test mode): this used to rely
+  // on switchTab('questions') to stop the countdown as a side effect (the
+  // non-'preview' branch of switchTab calls stopPreviewTimer()). That works
+  // for admins, but switchTab() silently rewrites any 'questions' request
+  // back to 'preview' for non-admins (see the `if(tab==='questions' &&
+  // !_isAdmin) tab='preview'` guard — test users have no Questions tab to
+  // go to). Since the tab never actually changed away from 'preview', the
+  // short-circuit "already on preview" branch ran instead, which never
+  // touches the timer. Net effect: a test user hitting "💾 Save & Pause"
+  // saw "Progress saved" and believed the clock had stopped, but the
+  // setInterval kept ticking in the background the whole time they were
+  // away — and could auto-submit their quiz before they ever came back.
+  // Stopping the timer explicitly here makes Pause work the same way
+  // regardless of role, instead of depending on a tab-switch side effect
+  // that doesn't happen for every user.
+  stopPreviewTimer();
   try{
     await _savePreviewDraft();
     showShortcutToast('💾 Progress saved — resume from the Preview tab anytime');
@@ -8391,7 +8429,14 @@ async function pausePreview(){
     console.warn('pausePreview: failed to save draft', e);
     showShortcutToast('⚠ Could not save your progress — please try again');
   }
-  switchTab('questions');
+  if(_isAdmin){
+    switchTab('questions');
+  } else {
+    // No Questions tab to go to — just re-render Preview in place so the
+    // now-stopped timer visibly reflects the paused state instead of
+    // looking like nothing happened.
+    renderPreview();
+  }
 }
 
 function buildPreviewPages(){
