@@ -828,54 +828,41 @@ kbd{background:var(--surface);border:1.5px solid var(--border);border-bottom-wid
    Enter/Space fades the texture out and the real text in; tap again to
    re-hide. See _spoilerize() in app.js for the full delimiter config.
 
-   display:inline-block (not the default inline) is deliberate: a plain
-   inline span with position:relative + an inset:0 pseudo-element can get
-   sized against the bounding box of ALL its wrapped line fragments when
-   it straddles a line break, instead of each line individually — an
-   oversized, misplaced dotted rectangle that shoves following text (e.g.
-   the "(1pts)" badge right after it) onto its own line. inline-block
-   makes it one atomic, self-contained chip: sized to its own content,
-   wraps as a single unit, never fragments mid-render. */
+   display:inline + box-decoration-break:clone (not inline-block) is
+   deliberate. A short, single-line hint (e.g. a one-word translation gloss)
+   looks fine either way. But question labels can carry a much longer
+   hidden hint that needs two lines on its own — and inline-block forces
+   the whole hint into ONE atomic box sized to its full multi-line bounding
+   rect, which then floats as an oversized, disconnected rectangle instead
+   of following the paragraph's natural line flow (this was the cause of
+   the misshapen dotted block seen on longer MC-question hints). Painting
+   the dotted background straight on the element with box-decoration-break:
+   clone instead gives each wrapped line fragment its own neatly rounded
+   chip — consistent for a one-word hint and a full-sentence hint alike. */
 .p-spoiler{
-  display:inline-block;
-  position:relative;
+  display:inline;
   cursor:pointer;
   border-radius:5px;
   padding:1px 5px;
-  margin:0 2px;
+  margin:0 1px;
   line-height:1.35;
-  vertical-align:baseline;
-  max-width:100%;
-  transition:color .16s ease;
+  box-decoration-break:clone;
+  -webkit-box-decoration-break:clone;
+  transition:background-color .16s ease,color .16s ease;
   outline:none;
   -webkit-tap-highlight-color:transparent;
 }
 .p-spoiler[data-revealed="false"]{
   color:transparent;
   user-select:none;
-}
-.p-spoiler[data-revealed="false"]::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  border-radius:5px;
   background-color:var(--text3,#9aa0a6);
   background-image:radial-gradient(rgba(255,255,255,.6) 1px, transparent 1.4px);
   background-size:5px 5px;
-  transition:background-color .16s ease;
 }
-.p-spoiler[data-revealed="false"]:hover::before{background-color:var(--text2,#7a7a7a)}
+.p-spoiler[data-revealed="false"]:hover{background-color:var(--text2,#7a7a7a)}
 .p-spoiler[data-revealed="true"]{
-  background:var(--purple-dim);
+  background-color:var(--purple-dim);
   color:#4a148c;
-}
-.p-spoiler[data-revealed="true"]::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  border-radius:5px;
-  opacity:0;
-  transition:opacity .16s ease;
 }
 .p-spoiler:focus-visible{outline:2px solid var(--purple,#5c35b1);outline-offset:2px}
 .p-drag-clear-btn{background:none;border:none;cursor:pointer;color:var(--text3);margin-left:auto}
@@ -3843,6 +3830,22 @@ function _linkifyText(text) {
     }
     return _autoLink(tok.value);
   }).join('');
+}
+
+/**
+ * Shared "* (Npts)" badge markup for a question/item — the little required
+ * asterisk plus point value shown next to a question's label (or, for
+ * translation questions, next to the source sentence instead, since that
+ * type skips the shared label — see QUESTION_TYPES.translation.buildPreview).
+ * Kept as ONE function so every render site stays in sync; previously this
+ * markup was hand-duplicated in three places and had started to drift.
+ * @param {{required?:boolean, points?:number}} it
+ * @returns {string} HTML for the badge, or '' if neither applies.
+ */
+function _reqPointsBadge(it) {
+  const req    = it.required ? `<span class="pq-req">*</span>` : '';
+  const points = it.points ? ` <span style="font-size:11px;color:var(--text3)">(${it.points}pts)</span>` : '';
+  return req + points;
 }
 
 /**
@@ -8009,7 +8012,7 @@ const QUESTION_TYPES = {
       // The shared question title is intentionally skipped for this type (see
       // renderPreview), so its required/points indicator lives here instead,
       // next to the source sentence.
-      const meta=`${q.required?`<span class="pq-req">*</span>`:''}${q.points?` <span style="font-size:11px;color:var(--text3)">(${q.points}pts)</span>`:''}`;
+      const meta=_reqPointsBadge(q);
       return`<div class="p-translation-source">${renderSpoilerSourceText(q.sourceText)}${meta}</div><div class="p-input-wrap"><input class="p-text-input" id="pinp-${q.id}" type="text" placeholder="Type your translation…" value="${escHtml(ans||'')}"><div class="p-uline"></div></div>${hint}`;
     },
     score(q,ans){
@@ -8829,7 +8832,7 @@ function renderPreview(){
       // guaranteed leak no amount of masking downstream can fix. So for this
       // type we skip the title entirely; the required/points indicator moves
       // into the masked source line instead (see translation.buildPreview).
-      const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${it.required?`<span class="pq-req">*</span>`:''}${it.points?` <span style="font-size:11px;color:var(--text3)">(${it.points}pts)</span>`:''}</div>`;
+      const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${_reqPointsBadge(it)}</div>`;
       html+=`<div class="pq-card${err?' p-error':''}" data-qid="${it.id}">${labelHtml}${renderPreviewField(it)}${err?`<div class="p-err">⚠ Required</div>`:''}</div>`;
     }
   });
@@ -8884,7 +8887,7 @@ window.addEventListener('beforeunload', ()=>{
           // See the matching comment in renderPreview(): translation labels
           // duplicate sourceText's bracketed hint in plaintext, so skip the
           // title for that type here too.
-          const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${it.required?`<span class="pq-req">*</span>`:''}${it.points?` <span style="font-size:11px;color:var(--text3)">(${it.points}pts)</span>`:''}</div>`;
+          const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${_reqPointsBadge(it)}</div>`;
           card.innerHTML=`${labelHtml}${renderPreviewField(it)}`;
           block.appendChild(card);
         }
