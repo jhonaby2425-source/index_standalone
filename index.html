@@ -819,18 +819,33 @@ kbd{background:var(--surface);border:1.5px solid var(--border);border-bottom-wid
 .p-translation-source{margin-bottom:10px;padding:9px 13px;background:var(--surface2);border-radius:6px;font-size:13px;font-style:italic;border-left:3px solid var(--purple-mid)}
 
 /* ── Spoiler-style inline hints (Telegram-esque tap-to-reveal) ────────────
-   Wraps [bracketed], (parenthesized), or {curly} vocab/answer hints inside
-   a question's text with a tap-to-reveal spoiler. Hidden by default behind
-   a dotted noise texture — the same visual language as Telegram's spoiler,
-   not a flat redaction bar. Tap/click or Enter/Space fades the texture out
-   and the real text in; tap again to re-hide. See _spoilerize() in app.js
-   for the delimiter config and \[ \] \( \) \{ \} escaping. */
+   Wraps [bracketed], ((double-parenthesized)), or {{double-curly}} vocab/
+   answer hints inside a question's text with a tap-to-reveal spoiler.
+   Round/curly require doubling since a single ( or { is ordinary prose
+   punctuation (a clue, a point value) and shouldn't be auto-hidden.
+   Hidden by default behind a dotted noise texture — the same visual
+   language as Telegram's spoiler, not a flat redaction bar. Tap/click or
+   Enter/Space fades the texture out and the real text in; tap again to
+   re-hide. See _spoilerize() in app.js for the full delimiter config.
+
+   display:inline-block (not the default inline) is deliberate: a plain
+   inline span with position:relative + an inset:0 pseudo-element can get
+   sized against the bounding box of ALL its wrapped line fragments when
+   it straddles a line break, instead of each line individually — an
+   oversized, misplaced dotted rectangle that shoves following text (e.g.
+   the "(1pts)" badge right after it) onto its own line. inline-block
+   makes it one atomic, self-contained chip: sized to its own content,
+   wraps as a single unit, never fragments mid-render. */
 .p-spoiler{
+  display:inline-block;
   position:relative;
   cursor:pointer;
   border-radius:5px;
-  padding:0 3px;
-  margin:0 1px;
+  padding:1px 5px;
+  margin:0 2px;
+  line-height:1.35;
+  vertical-align:baseline;
+  max-width:100%;
   transition:color .16s ease;
   outline:none;
   -webkit-tap-highlight-color:transparent;
@@ -3681,21 +3696,35 @@ const _setSafeInnerHTML = _setSafeHTML;
  */
 /**
  * §SPOILER — delimiter config for tap-to-reveal hint syntax.
+ * `repeat` is how many times the character must appear in a row to count
+ * as a delimiter. Square brackets stay single — "[hint]" — because a
+ * single "[" almost never shows up in ordinary quiz prose, so this matches
+ * the original, already-safe behavior exactly.
+ * Round and curly are set to repeat:2 — "((hint))" / "{{hint}}" — because
+ * a SINGLE "(" or "{" is completely ordinary in normal question text (a
+ * clue in parentheses, a point value, an aside). Treating every single
+ * pair as a spoiler blurred real, meant-to-be-visible text — e.g. a clue
+ * like "(Clue: physical perception ('oír') ...)" got auto-hidden even
+ * though nobody asked for that. Requiring the bracket doubled makes the
+ * intent to hide something unambiguous, with none of ordinary punctuation's
+ * false-positive risk — no per-instance escaping needed for normal prose.
  * Add a new bracket pair here to support it everywhere _spoilerize is
  * used (question text, translation source sentences) — nothing else in
  * the pipeline needs to change.
  */
 const SPOILER_DELIMS = [
-  { open: '[', close: ']' },
-  { open: '(', close: ')' },
-  { open: '{', close: '}' },
+  { open: '[', close: ']', repeat: 1 },
+  { open: '(', close: ')', repeat: 2 },
+  { open: '{', close: '}', repeat: 2 },
 ];
 
 /**
- * Escaping: a quiz author can write \[ \] \( \) \{ \} to force a literal
- * bracket that is NEVER treated as a hint marker — e.g. "\(1pt\)" so a
- * point value stays visible even though round brackets are also a spoiler
- * delimiter. Each escape sequence is swapped for a private-use placeholder
+ * Escaping: a quiz author can still write \[ \] \( \) \{ \} to force a
+ * literal bracket that is NEVER treated as (part of) a hint marker — kept
+ * as a safety valve for the rare case someone's text legitimately needs a
+ * literal doubled bracket, e.g. "\(\(math notation\)\)". For ordinary
+ * single parentheses/braces, no escaping is needed at all — see repeat
+ * above. Each escape sequence is swapped for a private-use placeholder
  * before matching (so the main regex can't see it as a delimiter), then
  * swapped back to the literal character once matching is done.
  */
@@ -3714,22 +3743,27 @@ function _escapeRegexChar(ch) {
   return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 function _spoilerPattern() {
-  const parts = SPOILER_DELIMS.map(({ open, close }) => {
+  const parts = SPOILER_DELIMS.map(({ open, close, repeat }) => {
     const o = _escapeRegexChar(open), c = _escapeRegexChar(close);
-    return `${o}([^${o}${c}]+)${c}`; // one capture group per delimiter
+    const oRep = o.repeat(repeat), cRep = c.repeat(repeat);
+    // inner content still excludes the bare character, so nested/adjacent
+    // brackets of the same type don't get swallowed by one big match
+    return `${oRep}([^${o}${c}]+)${cRep}`; // one capture group per delimiter
   });
   return new RegExp(parts.join('|'), 'g');
 }
 
 /**
- * Wrap [bracketed], (parenthesized), or {curly} hint text inside an
- * ALREADY-HTML-ESCAPED string with a Telegram-style tap-to-reveal spoiler
- * span. Shared by every place a quiz author's text is rendered for
+ * Wrap [bracketed], ((double-parenthesized)), or {{double-curly}} hint text
+ * inside an ALREADY-HTML-ESCAPED string with a Telegram-style tap-to-reveal
+ * spoiler span. Shared by every place a quiz author's text is rendered for
  * students — question labels/titles (via _linkifyText below) as well as
  * translation source sentences (via renderSpoilerSourceText) — so a hint
  * behaves identically no matter which bracket style or question type it's
- * typed into. Escaped brackets (\[ \] \( \) \{ \}) are left as literal
- * text and never become a spoiler.
+ * typed into. The doubled marker is normalized down to a single bracket
+ * pair on display ("((x))" renders as "(x)") since the doubling is purely
+ * a syntax signal, not something a student needs to see. Escaped brackets
+ * (\[ \] \( \) \{ \}) are left as literal text and never become a spoiler.
  * @param {string} escapedHtml  Text that has ALREADY been HTML-escaped.
  * @returns {string} HTML with hints replaced by spoiler spans.
  */
@@ -9470,16 +9504,17 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 // ── Spoiler-style hints in translation source sentences ─────────────────────
 // Question authors can embed a vocab/grammar hint inline in the source
-// sentence using square brackets, parentheses, or curly braces, e.g.
+// sentence using square brackets, or double parentheses/curly braces, e.g.
 //   "I put my phone on the desk. [poner: to put / sobre: on / escritorio: desk]"
-//   "I put my phone on the desk. (poner: to put / sobre: on / escritorio: desk)"
+//   "I put my phone on the desk. ((poner: to put / sobre: on / escritorio: desk))"
 // Since that bracketed part basically hands the student the answer, it's
 // hidden behind a Telegram-style tap-to-reveal spoiler in the student-facing
 // preview instead of being shown outright. The plain-text editor (where the
 // teacher writes the sentence) is untouched — only the rendered preview.
-// A literal bracket that ISN'T meant as a hint (e.g. a point value like
-// "(1pt)") can be escaped as "\(1pt\)" to keep it out of the spoiler — see
-// _spoilerize() / SPOILER_DELIMS above for the full delimiter + escape rules.
+// Round/curly require DOUBLING — "((hint))" not "(hint)" — precisely so
+// ordinary single parentheses in a normal sentence, like a "(1pt)" label or
+// a plain "(clue in parens)", are never mistaken for a hint. See
+// _spoilerize() / SPOILER_DELIMS above for the full delimiter rules.
 function renderSpoilerSourceText(text){
   const esc=escHtml(text||'');
   if(!esc)return'(No source text)';
@@ -10835,7 +10870,7 @@ document.addEventListener('touchstart',e=>{
   if(failed===0){
     console.log(`%c✅ All ${total} scoring unit tests passed.`,'color:#2e7d32;font-weight:bold');
   }else{
-    console.warn(`%c⚠ ${failed}/${total} scoring tests FAILED — see errors above.`,'color:#c62828;fonta-weight:bold');
+    console.warn(`%c⚠ ${failed}/${total} scoring tests FAILED — see errors above.`,'color:#c62828;font-weight:bold');
   }
 })();
 
