@@ -3741,6 +3741,36 @@ function _spoilerPattern() {
 }
 
 /**
+ * §CLUE-AUTOHIDE — a "(Clue: ...)" aside almost always spells out the exact
+ * vocabulary/grammar point a multiple-choice question is testing, e.g.
+ * "(Clue: ... uses 'lograr'.)" sitting in cleartext right next to the
+ * answer choice "logró". Requiring authors to remember to double-wrap
+ * ((just the giveaway word)) turned out to be unrealistic in practice —
+ * almost nobody did, so the whole clue rendered as plain, spoiler-free
+ * text and gave the answer away outright. So a clue is now spoiler-hidden
+ * automatically whenever it's explicitly labeled — matched purely on the
+ * label word itself (case-insensitive), never on a bare "(" the way the
+ * general delimiter above deliberately avoids (see SPOILER_DELIMS comment).
+ * Nobody writes "Clue:"/"Hint:"/"Pista:"/"Nota:" by accident, so this has
+ * the same near-zero false-positive profile as the doubled-bracket rule
+ * while actually matching how authors write clues. Manual [bracket] /
+ * ((double-paren)) hints elsewhere in the text still work exactly as
+ * before — this only pre-empts the specific labeled-clue case.
+ * Doesn't handle a clue containing its own nested parentheses (rare in
+ * practice); such a clue still renders, just unhidden past the first ")".
+ */
+const _CLUE_LABEL_RE = /\((\s*(?:clue|hint|pista|nota)\s*:[^()]*)\)/gi;
+function _autoHideLabeledClues(s) {
+  return s.replace(_CLUE_LABEL_RE, (whole) => {
+    return `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
+      `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
+      `onclick="toggleSpoiler(this)" `+
+      `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
+      `${whole}</span>`;
+  });
+}
+
+/**
  * Wrap [bracketed], ((double-parenthesized)), or {{double-curly}} hint text
  * inside an ALREADY-HTML-ESCAPED string with a Telegram-style tap-to-reveal
  * spoiler span. Shared by every place a quiz author's text is rendered for
@@ -3751,12 +3781,15 @@ function _spoilerPattern() {
  * pair on display ("((x))" renders as "(x)") since the doubling is purely
  * a syntax signal, not something a student needs to see. Escaped brackets
  * (\[ \] \( \) \{ \}) are left as literal text and never become a spoiler.
+ * A labeled "(Clue: ...)" aside is auto-hidden first (see
+ * _autoHideLabeledClues above) before the manual-bracket pass runs.
  * @param {string} escapedHtml  Text that has ALREADY been HTML-escaped.
  * @returns {string} HTML with hints replaced by spoiler spans.
  */
 function _spoilerize(escapedHtml) {
   if (!escapedHtml) return '';
-  const hidden = _hideSpoilerEscapes(escapedHtml);
+  let hidden = _hideSpoilerEscapes(escapedHtml);
+  hidden = _autoHideLabeledClues(hidden);
   const out = hidden.replace(_spoilerPattern(), function () {
     const args = Array.prototype.slice.call(arguments, 0, -2); // drop offset, fullString
     const groups = args.slice(1);
