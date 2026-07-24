@@ -333,6 +333,13 @@ body.role-viewer .role-viewer-only{display:block}
 .add-section-btn:hover{background:var(--surface2);border-color:var(--text3)}
 .drag-handle{position:absolute;top:7px;left:50%;transform:translateX(-50%);color:var(--border);cursor:grab;font-size:13px;letter-spacing:1.5px;user-select:none}
 .drag-handle:hover{color:var(--text3)}
+/* Keyboard-operable alternative to drag-and-drop reordering (WCAG 2.1.1).
+   Sits top-right of each card so it doesn't collide with the drag handle. */
+.move-btn-group{position:absolute;top:6px;right:8px;display:flex;gap:2px;z-index:2}
+.move-btn{width:20px;height:18px;padding:0;border:1px solid var(--border-light);border-radius:4px;background:var(--surface);color:var(--text3);font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s,border-color .12s}
+.move-btn:hover:not(:disabled){background:var(--purple-dim);color:var(--purple);border-color:var(--border)}
+.move-btn:focus-visible{outline:2px solid var(--purple);outline-offset:1px}
+.move-btn:disabled{opacity:.35;cursor:default}
 .q-card.dragging-card{opacity:.5;border:2px dashed var(--purple)}
 .q-card.drag-over-card{border-top:3px solid var(--purple)}
 .drag-drop-gap{
@@ -819,49 +826,27 @@ kbd{background:var(--surface);border:1.5px solid var(--border);border-bottom-wid
 .p-translation-source{margin-bottom:10px;padding:9px 13px;background:var(--surface2);border-radius:6px;font-size:13px;font-style:italic;border-left:3px solid var(--purple-mid)}
 
 /* ── Spoiler-style inline hints (Telegram-esque tap-to-reveal) ────────────
-   Wraps [bracketed], ((double-parenthesized)), or {{double-curly}} vocab/
-   answer hints inside a question's text with a tap-to-reveal spoiler.
-   Round/curly require doubling since a single ( or { is ordinary prose
-   punctuation (a clue, a point value) and shouldn't be auto-hidden.
-   Hidden by default behind a dotted noise texture — the same visual
-   language as Telegram's spoiler, not a flat redaction bar. Tap/click or
-   Enter/Space fades the texture out and the real text in; tap again to
-   re-hide. See _spoilerize() in app.js for the full delimiter config.
-
-   display:inline + box-decoration-break:clone (not inline-block) is
-   deliberate. A short, single-line hint (e.g. a one-word translation gloss)
-   looks fine either way. But question labels can carry a much longer
-   hidden hint that needs two lines on its own — and inline-block forces
-   the whole hint into ONE atomic box sized to its full multi-line bounding
-   rect, which then floats as an oversized, disconnected rectangle instead
-   of following the paragraph's natural line flow (this was the cause of
-   the misshapen dotted block seen on longer MC-question hints). Painting
-   the dotted background straight on the element with box-decoration-break:
-   clone instead gives each wrapped line fragment its own neatly rounded
-   chip — consistent for a one-word hint and a full-sentence hint alike. */
+   Wraps [bracketed] vocab/answer hints inside a translation question's
+   source sentence. Hidden by default behind a solid blob; tap/click or
+   Enter/Space reveals the real text underneath, tap again to re-hide. */
 .p-spoiler{
-  display:inline;
   cursor:pointer;
   border-radius:5px;
-  padding:1px 5px;
+  padding:0 3px;
   margin:0 1px;
-  line-height:1.35;
-  box-decoration-break:clone;
-  -webkit-box-decoration-break:clone;
-  transition:background-color .16s ease,color .16s ease;
+  transition:background-color .18s ease, color .12s ease, text-shadow .12s ease;
   outline:none;
   -webkit-tap-highlight-color:transparent;
 }
 .p-spoiler[data-revealed="false"]{
+  background:var(--text3,#9aa0a6);
   color:transparent;
+  text-shadow:none;
   user-select:none;
-  background-color:var(--text3,#9aa0a6);
-  background-image:radial-gradient(rgba(255,255,255,.6) 1px, transparent 1.4px);
-  background-size:5px 5px;
 }
-.p-spoiler[data-revealed="false"]:hover{background-color:var(--text2,#7a7a7a)}
+.p-spoiler[data-revealed="false"]:hover{background:var(--text2,#7a7a7a)}
 .p-spoiler[data-revealed="true"]{
-  background-color:var(--purple-dim);
+  background:var(--purple-dim);
   color:#4a148c;
 }
 .p-spoiler:focus-visible{outline:2px solid var(--purple,#5c35b1);outline-offset:2px}
@@ -3682,127 +3667,24 @@ const _setSafeInnerHTML = _setSafeHTML;
  * @returns {string}     HTML string with links rendered as <a> tags; all other text is escaped.
  */
 /**
- * §SPOILER — delimiter config for tap-to-reveal hint syntax.
- * `repeat` is how many times the character must appear in a row to count
- * as a delimiter. Square brackets stay single — "[hint]" — because a
- * single "[" almost never shows up in ordinary quiz prose, so this matches
- * the original, already-safe behavior exactly.
- * Round and curly are set to repeat:2 — "((hint))" / "{{hint}}" — because
- * a SINGLE "(" or "{" is completely ordinary in normal question text (a
- * clue in parentheses, a point value, an aside). Treating every single
- * pair as a spoiler blurred real, meant-to-be-visible text — e.g. a clue
- * like "(Clue: physical perception ('oír') ...)" got auto-hidden even
- * though nobody asked for that. Requiring the bracket doubled makes the
- * intent to hide something unambiguous, with none of ordinary punctuation's
- * false-positive risk — no per-instance escaping needed for normal prose.
- * Add a new bracket pair here to support it everywhere _spoilerize is
- * used (question text, translation source sentences) — nothing else in
- * the pipeline needs to change.
- */
-const SPOILER_DELIMS = [
-  { open: '[', close: ']', repeat: 1 },
-  { open: '(', close: ')', repeat: 2 },
-  { open: '{', close: '}', repeat: 2 },
-];
-
-/**
- * Escaping: a quiz author can still write \[ \] \( \) \{ \} to force a
- * literal bracket that is NEVER treated as (part of) a hint marker — kept
- * as a safety valve for the rare case someone's text legitimately needs a
- * literal doubled bracket, e.g. "\(\(math notation\)\)". For ordinary
- * single parentheses/braces, no escaping is needed at all — see repeat
- * above. Each escape sequence is swapped for a private-use placeholder
- * before matching (so the main regex can't see it as a delimiter), then
- * swapped back to the literal character once matching is done.
- */
-const _SPOILER_ESCAPES = [
-  ['\\[', '[', '\uE000'], ['\\]', ']', '\uE001'],
-  ['\\(', '(', '\uE002'], ['\\)', ')', '\uE003'],
-  ['\\{', '{', '\uE004'], ['\\}', '}', '\uE005'],
-];
-function _hideSpoilerEscapes(s) {
-  return _SPOILER_ESCAPES.reduce((out, [seq, , ph]) => out.split(seq).join(ph), s);
-}
-function _restoreSpoilerEscapes(s) {
-  return _SPOILER_ESCAPES.reduce((out, [, lit, ph]) => out.split(ph).join(lit), s);
-}
-function _escapeRegexChar(ch) {
-  return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-function _spoilerPattern() {
-  const parts = SPOILER_DELIMS.map(({ open, close, repeat }) => {
-    const o = _escapeRegexChar(open), c = _escapeRegexChar(close);
-    const oRep = o.repeat(repeat), cRep = c.repeat(repeat);
-    // inner content still excludes the bare character, so nested/adjacent
-    // brackets of the same type don't get swallowed by one big match
-    return `${oRep}([^${o}${c}]+)${cRep}`; // one capture group per delimiter
-  });
-  return new RegExp(parts.join('|'), 'g');
-}
-
-/**
- * §CLUE-AUTOHIDE — a "(Clue: ...)" aside almost always spells out the exact
- * vocabulary/grammar point a multiple-choice question is testing, e.g.
- * "(Clue: ... uses 'lograr'.)" sitting in cleartext right next to the
- * answer choice "logró". Requiring authors to remember to double-wrap
- * ((just the giveaway word)) turned out to be unrealistic in practice —
- * almost nobody did, so the whole clue rendered as plain, spoiler-free
- * text and gave the answer away outright. So a clue is now spoiler-hidden
- * automatically whenever it's explicitly labeled — matched purely on the
- * label word itself (case-insensitive), never on a bare "(" the way the
- * general delimiter above deliberately avoids (see SPOILER_DELIMS comment).
- * Nobody writes "Clue:"/"Hint:"/"Pista:"/"Nota:" by accident, so this has
- * the same near-zero false-positive profile as the doubled-bracket rule
- * while actually matching how authors write clues. Manual [bracket] /
- * ((double-paren)) hints elsewhere in the text still work exactly as
- * before — this only pre-empts the specific labeled-clue case.
- * Doesn't handle a clue containing its own nested parentheses (rare in
- * practice); such a clue still renders, just unhidden past the first ")".
- */
-const _CLUE_LABEL_RE = /\((\s*(?:clue|hint|pista|nota)\s*:[^()]*)\)/gi;
-function _autoHideLabeledClues(s) {
-  return s.replace(_CLUE_LABEL_RE, (whole) => {
-    return `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
-      `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
-      `onclick="toggleSpoiler(this)" `+
-      `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
-      `${whole}</span>`;
-  });
-}
-
-/**
- * Wrap [bracketed], ((double-parenthesized)), or {{double-curly}} hint text
- * inside an ALREADY-HTML-ESCAPED string with a Telegram-style tap-to-reveal
- * spoiler span. Shared by every place a quiz author's text is rendered for
- * students — question labels/titles (via _linkifyText below) as well as
- * translation source sentences (via renderSpoilerSourceText) — so a hint
- * behaves identically no matter which bracket style or question type it's
- * typed into. The doubled marker is normalized down to a single bracket
- * pair on display ("((x))" renders as "(x)") since the doubling is purely
- * a syntax signal, not something a student needs to see. Escaped brackets
- * (\[ \] \( \) \{ \}) are left as literal text and never become a spoiler.
- * A labeled "(Clue: ...)" aside is auto-hidden first (see
- * _autoHideLabeledClues above) before the manual-bracket pass runs.
+ * Wrap [bracketed] hint text inside an ALREADY-HTML-ESCAPED string with a
+ * Telegram-style tap-to-reveal spoiler span. Shared by every place a quiz
+ * author's text is rendered for students — question labels/titles (via
+ * _linkifyText below) as well as translation source sentences (via
+ * renderSpoilerSourceText) — so "[vocab: hint]" behaves identically no
+ * matter which question type it's typed into.
  * @param {string} escapedHtml  Text that has ALREADY been HTML-escaped.
- * @returns {string} HTML with hints replaced by spoiler spans.
+ * @returns {string} HTML with bracketed hints replaced by spoiler spans.
  */
 function _spoilerize(escapedHtml) {
   if (!escapedHtml) return '';
-  let hidden = _hideSpoilerEscapes(escapedHtml);
-  hidden = _autoHideLabeledClues(hidden);
-  const out = hidden.replace(_spoilerPattern(), function () {
-    const args = Array.prototype.slice.call(arguments, 0, -2); // drop offset, fullString
-    const groups = args.slice(1);
-    const idx = groups.findIndex(g => g !== undefined);
-    const { open, close } = SPOILER_DELIMS[idx];
-    const inner = groups[idx];
-    return `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
-      `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
-      `onclick="toggleSpoiler(this)" `+
-      `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
-      `${open}${inner}${close}</span>`;
-  });
-  return _restoreSpoilerEscapes(out);
+  return escapedHtml.replace(/\[([^\[\]]+)\]/g, (_m, inner) =>
+    `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
+    `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
+    `onclick="toggleSpoiler(this)" `+
+    `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
+    `[${inner}]</span>`
+  );
 }
 
 function _linkifyText(text) {
@@ -3863,22 +3745,6 @@ function _linkifyText(text) {
     }
     return _autoLink(tok.value);
   }).join('');
-}
-
-/**
- * Shared "* (Npts)" badge markup for a question/item — the little required
- * asterisk plus point value shown next to a question's label (or, for
- * translation questions, next to the source sentence instead, since that
- * type skips the shared label — see QUESTION_TYPES.translation.buildPreview).
- * Kept as ONE function so every render site stays in sync; previously this
- * markup was hand-duplicated in three places and had started to drift.
- * @param {{required?:boolean, points?:number}} it
- * @returns {string} HTML for the badge, or '' if neither applies.
- */
-function _reqPointsBadge(it) {
-  const req    = it.required ? `<span class="pq-req">*</span>` : '';
-  const points = it.points ? ` <span style="font-size:11px;color:var(--text3)">(${it.points}pts)</span>` : '';
-  return req + points;
 }
 
 /**
@@ -4397,6 +4263,12 @@ let _driveSyncTimer=null;
 let _drivePushInFlight=false;
 let _drivePushQueuedAgain=false;
 let _driveHydrating=false;
+// Last modifiedTime we know Drive had for the library file, captured every
+// time we hydrate FROM Drive or successfully push TO Drive. Compared right
+// before every push so a second admin's (or a second tab's) concurrent edit
+// is detected instead of silently overwritten — see _driveUpdateFile below.
+let _driveKnownModifiedTime=null;
+let _driveConflictPending=false;
 
 // Fail-safe default: if ADMIN_EMAILS is configured, nobody is treated as
 // admin until we've actually verified a signed-in email against that list.
@@ -4925,12 +4797,41 @@ async function _driveCreateFile(payload){
   return j.id;
 }
 
-async function _driveUpdateFile(fileId,payload){
-  await _driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{
+// Optimistic-concurrency guard: Drive's media-upload PATCH has no native
+// If-Match/etag support, so we approximate it by checking the file's
+// modifiedTime immediately before writing. If it moved since the last time
+// WE read or wrote it, someone else (another admin, another tab) changed
+// the library in between — pushing now would silently discard their edit.
+// In that case we abort the push, flip a conflict flag, and surface a
+// reload prompt instead. force=true (used by the "Overwrite anyway" /
+// "Reload & retry" UI) skips the check.
+async function _driveUpdateFile(fileId,payload,force){
+  if(!force){
+    try{
+      const meta=await _driveGetFileMeta(fileId);
+      const remoteModified=meta&&meta.modifiedTime;
+      if(_driveKnownModifiedTime && remoteModified && remoteModified!==_driveKnownModifiedTime){
+        _driveConflictPending=true;
+        _driveSetStatus('err','Sync conflict — this quiz library changed elsewhere. Reload to get the latest version before your next edit is saved.');
+        const evt=new CustomEvent('drive-sync-conflict',{detail:{fileId}});
+        document.dispatchEvent(evt);
+        throw new Error('drive_sync_conflict');
+      }
+    }catch(e){
+      if(e && e.message==='drive_sync_conflict') throw e;
+      // Metadata check itself failed (offline, transient API error, etc.) —
+      // don't block the write on a diagnostic call; fall through and push.
+    }
+  }
+  const r=await _driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=modifiedTime`,{
     method:'PATCH',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify(payload),
   });
+  try{
+    const j=await r.json();
+    if(j&&j.modifiedTime){_driveKnownModifiedTime=j.modifiedTime;_driveConflictPending=false;}
+  }catch(_){/* non-JSON response is not fatal to the write itself */}
 }
 
 // Pull-or-seed on connect: if a library already exists in Drive, it wins
@@ -4943,10 +4844,11 @@ async function _driveFindOrCreateFileAndHydrate(){
   // sharing, not something this app should silently paper over by making
   // them a brand new empty file.
   if(DRIVE_SHARED_FILE_ID){
-    await _driveGetFileMeta(DRIVE_SHARED_FILE_ID); // throws if not accessible
+    const meta=await _driveGetFileMeta(DRIVE_SHARED_FILE_ID); // throws if not accessible
     _driveFileId=DRIVE_SHARED_FILE_ID;
     const payload=await _driveDownloadFile(DRIVE_SHARED_FILE_ID);
     await _driveHydrateFromPayload(payload);
+    _driveKnownModifiedTime=meta&&meta.modifiedTime||null;
     _driveLastSyncedAt=new Date();
     return;
   }
@@ -4955,9 +4857,12 @@ async function _driveFindOrCreateFileAndHydrate(){
     _driveFileId=existing.id;
     const payload=await _driveDownloadFile(existing.id);
     await _driveHydrateFromPayload(payload);
+    _driveKnownModifiedTime=existing.modifiedTime||null;
   } else if(_isAdmin){
     const payload=await buildLibraryPayload();
     _driveFileId=await _driveCreateFile(payload);
+    const created=await _driveGetFileMeta(_driveFileId);
+    _driveKnownModifiedTime=created&&created.modifiedTime||null;
   }
   _driveLastSyncedAt=new Date();
 }
@@ -5037,10 +4942,18 @@ async function _drivePushToDrive(){
     _driveUpdateLastSyncedLabel();
   }catch(e){
     console.warn('[drive] sync failed:',e);
-    _driveSetStatus('err','Sync failed — will retry on the next change. ('+e.message+')');
+    if(e && e.message!=='drive_sync_conflict'){
+      _driveSetStatus('err','Sync failed — will retry on the next change. ('+e.message+')');
+    }
+    // On a real conflict, deliberately do NOT auto-retry: retrying would
+    // just re-run the same stale-vs-remote comparison forever (or, worse,
+    // race the user's own reload). _driveConflictPending stays true until
+    // the conflict UI (listening for 'drive-sync-conflict') reloads from
+    // Drive or the user explicitly forces an overwrite.
+    if(e && e.message==='drive_sync_conflict'){_drivePushQueuedAgain=false;}
   }finally{
     _drivePushInFlight=false;
-    if(_drivePushQueuedAgain){_drivePushQueuedAgain=false;_drivePushToDrive();}
+    if(_drivePushQueuedAgain && !_driveConflictPending){_drivePushQueuedAgain=false;_drivePushToDrive();}
   }
 }
 
@@ -7813,7 +7726,7 @@ function renderSectionCardNode(s){
   descInp.addEventListener('click',e=>e.stopPropagation());
   descInp.addEventListener('mousedown',e=>e.stopPropagation());
   body.append(row,descInp);
-  wrap.append(stripe,body);
+  wrap.append(stripe,_makeMoveButtons(s.id,'section'),body);
   if(sel){
     const footer=document.createElement('div');footer.className='section-footer';
     const delBtn=document.createElement('button');delBtn.className='section-icon-btn del';delBtn.textContent='🗑 Delete section';
@@ -8045,7 +7958,7 @@ const QUESTION_TYPES = {
       // The shared question title is intentionally skipped for this type (see
       // renderPreview), so its required/points indicator lives here instead,
       // next to the source sentence.
-      const meta=_reqPointsBadge(q);
+      const meta=`${q.required?`<span class="pq-req">*</span>`:''}${q.points?` <span style="font-size:11px;color:var(--text3)">(${q.points}pts)</span>`:''}`;
       return`<div class="p-translation-source">${renderSpoilerSourceText(q.sourceText)}${meta}</div><div class="p-input-wrap"><input class="p-text-input" id="pinp-${q.id}" type="text" placeholder="Type your translation…" value="${escHtml(ans||'')}"><div class="p-uline"></div></div>${hint}`;
     },
     score(q,ans){
@@ -8265,6 +8178,7 @@ function renderQCardNode(q,i){
   wrap.addEventListener('click',()=>selectItem(q.id));
 
   const dragHandle=document.createElement('div');dragHandle.className='drag-handle';dragHandle.title='Drag to reorder';dragHandle.textContent='⋮⋮';
+  const moveBtns=_makeMoveButtons(q.id,'question');
 
   const cardBody=document.createElement('div');cardBody.className='q-card-body';
 
@@ -8385,8 +8299,54 @@ function renderQCardNode(q,i){
     });
   }(dragHandle, wrap));
 
-  wrap.append(dragHandle,cardBody,footer,tagsRow);
+  wrap.append(dragHandle,moveBtns,cardBody,footer,tagsRow);
   return wrap;
+}
+
+// Keyboard-operable equivalent of the drag-and-drop reorder above (WCAG
+// 2.1.1 — dragging has no keyboard path otherwise). Shared by the "Move
+// up"/"Move down" buttons rendered next to the drag handle on every card.
+function moveItemById(id,delta){
+  const fi=items.findIndex(it=>it.id===id);
+  if(fi===-1)return;
+  const ti=fi+delta;
+  if(ti<0||ti>=items.length)return;
+  pushHistory('Reorder');
+  const[m]=items.splice(fi,1);
+  items.splice(ti,0,m);
+  jumpToItemPage(id);renderBuilder();triggerAutoSave();
+  // Keep focus on the card's own move button after the list re-renders,
+  // instead of losing focus back to <body>, so repeated keyboard moves work.
+  requestAnimationFrame(()=>{
+    const btn=document.querySelector(`#qcard-${id} .move-btn-${delta<0?'up':'down'}`);
+    if(btn)btn.focus();
+  });
+}
+
+// Builds the "Move up" / "Move down" button pair used by both question and
+// section cards as the keyboard-operable alternative to drag-and-drop.
+// `label` (e.g. "question", "section") makes the announced accessible name
+// specific rather than a generic "Move up".
+function _makeMoveButtons(id,label){
+  const group=document.createElement('div');
+  group.className='move-btn-group';
+  group.setAttribute('role','group');
+  group.setAttribute('aria-label','Reorder '+label);
+  const up=document.createElement('button');
+  up.type='button';up.className='move-btn move-btn-up';
+  up.setAttribute('aria-label','Move '+label+' up');
+  up.title='Move up';up.textContent='▲';
+  up.addEventListener('click',e=>{e.stopPropagation();moveItemById(id,-1);});
+  const down=document.createElement('button');
+  down.type='button';down.className='move-btn move-btn-down';
+  down.setAttribute('aria-label','Move '+label+' down');
+  down.title='Move down';down.textContent='▼';
+  down.addEventListener('click',e=>{e.stopPropagation();moveItemById(id,1);});
+  const fi=items.findIndex(it=>it.id===id);
+  up.disabled=fi<=0;
+  down.disabled=fi===-1||fi>=items.length-1;
+  group.append(up,down);
+  return group;
 }
 
 let dragSrcId=null;
@@ -8865,7 +8825,7 @@ function renderPreview(){
       // guaranteed leak no amount of masking downstream can fix. So for this
       // type we skip the title entirely; the required/points indicator moves
       // into the masked source line instead (see translation.buildPreview).
-      const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${_reqPointsBadge(it)}</div>`;
+      const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${it.required?`<span class="pq-req">*</span>`:''}${it.points?` <span style="font-size:11px;color:var(--text3)">(${it.points}pts)</span>`:''}</div>`;
       html+=`<div class="pq-card${err?' p-error':''}" data-qid="${it.id}">${labelHtml}${renderPreviewField(it)}${err?`<div class="p-err">⚠ Required</div>`:''}</div>`;
     }
   });
@@ -8920,7 +8880,7 @@ window.addEventListener('beforeunload', ()=>{
           // See the matching comment in renderPreview(): translation labels
           // duplicate sourceText's bracketed hint in plaintext, so skip the
           // title for that type here too.
-          const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${_reqPointsBadge(it)}</div>`;
+          const labelHtml=it.type==='translation'?'':`<div class="pq-label">${_linkifyText(it.label||'Untitled')}${it.required?`<span class="pq-req">*</span>`:''}${it.points?` <span style="font-size:11px;color:var(--text3)">(${it.points}pts)</span>`:''}</div>`;
           card.innerHTML=`${labelHtml}${renderPreviewField(it)}`;
           block.appendChild(card);
         }
@@ -9540,17 +9500,12 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 // ── Spoiler-style hints in translation source sentences ─────────────────────
 // Question authors can embed a vocab/grammar hint inline in the source
-// sentence using square brackets, or double parentheses/curly braces, e.g.
+// sentence using square brackets, e.g.
 //   "I put my phone on the desk. [poner: to put / sobre: on / escritorio: desk]"
-//   "I put my phone on the desk. ((poner: to put / sobre: on / escritorio: desk))"
 // Since that bracketed part basically hands the student the answer, it's
 // hidden behind a Telegram-style tap-to-reveal spoiler in the student-facing
 // preview instead of being shown outright. The plain-text editor (where the
 // teacher writes the sentence) is untouched — only the rendered preview.
-// Round/curly require DOUBLING — "((hint))" not "(hint)" — precisely so
-// ordinary single parentheses in a normal sentence, like a "(1pt)" label or
-// a plain "(clue in parens)", are never mistaken for a hint. See
-// _spoilerize() / SPOILER_DELIMS above for the full delimiter rules.
 function renderSpoilerSourceText(text){
   const esc=escHtml(text||'');
   if(!esc)return'(No source text)';
