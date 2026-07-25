@@ -2671,7 +2671,7 @@ button,
           <span class="ur-count" id="redo-count" style="display:none">0</span>
         </button>
       </div>
-      <button class="btn-attempts" onclick="openAttemptsModal()" id="topbar-attempts-btn">
+      <button class="btn-attempts admin-only" onclick="openAttemptsModal()" id="topbar-attempts-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         History
         <span class="attempts-count-badge" id="topbar-attempts-count" style="display:none">0</span>
@@ -2738,7 +2738,7 @@ button,
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="toc-link-icon"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Import Questions
         </a>
-        <a class="toc-link" href="#anchor-attempts-modal">
+        <a class="toc-link admin-only" href="#anchor-attempts-modal">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="toc-link-icon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Attempt History
         </a>
@@ -2781,7 +2781,7 @@ button,
           <div class="dash-subtitle" id="dash-subtitle">0 forms created</div>
         </div>
         <div class="dash-header-actions">
-          <button class="btn-attempts btn-attempts--attempts" onclick="openAttemptsModal()">
+          <button class="btn-attempts btn-attempts--attempts admin-only" onclick="openAttemptsModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             My Attempts
             <span class="attempts-count-badge attempts-count-badge--purple" id="dash-attempts-count" style="display:none">0</span>
@@ -4212,6 +4212,15 @@ const DRIVE_CLIENT_ID = '685955252889-efh55bll8irll4086nnpkapen9cqfnb2.apps.goog
 // Drive access.
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
 const DRIVE_FILE_NAME = 'quizbuilder_library.json';
+// §VIEWER-ATTEMPTS-BACKUP — non-admin ("test mode") accounts only ever get
+// Viewer access to the shared library file above, so they can never write
+// their own quiz attempts into it (see scheduleDriveSync). Instead, each
+// non-admin account gets its OWN private file under this name, created by
+// this app in THAT account's Drive (drive.file scope grants exactly that:
+// write access to files the app itself created there) — completely
+// separate from, and invisible to, the admin's shared library. See
+// _driveFindOrCreateViewerAttemptsFileAndHydrate / _drivePushViewerAttemptsToDrive.
+const DRIVE_VIEWER_ATTEMPTS_FILE_NAME = 'quizbuilder_my_attempts.json';
 const DRIVE_SYNC_DEBOUNCE_MS = 2500;
 const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-reconnect", never the token itself
 
@@ -4275,6 +4284,15 @@ let _driveHydrating=false;
 // is detected instead of silently overwritten — see _driveUpdateFile below.
 let _driveKnownModifiedTime=null;
 let _driveConflictPending=false;
+// Separate bookkeeping for the non-admin's private attempts-backup file
+// (see DRIVE_VIEWER_ATTEMPTS_FILE_NAME above) — intentionally independent
+// of _driveFileId/_driveSyncTimer/etc. above, which always refer to the
+// (admin-writable) library file.
+let _driveViewerAttemptsFileId=null;
+let _driveViewerAttemptsKnownModifiedTime=null;
+let _driveViewerAttemptsSyncTimer=null;
+let _driveViewerAttemptsPushInFlight=false;
+let _driveViewerAttemptsPushQueuedAgain=false;
 
 // Fail-safe default: if ADMIN_EMAILS is configured, nobody is treated as
 // admin until we've actually verified a signed-in email against that list.
@@ -4558,7 +4576,7 @@ function _driveRenderModalUI(){
     const roleNote = ADMIN_EMAILS.length===0 ? '' :
       (_isAdmin
         ? '<div class="drive-role-note drive-role-note-admin">★ You are an admin — your edits sync to Drive.</div>'
-        : '<div class="drive-role-note drive-role-note-viewer">👁 You are a test user — you can take quizzes here, but edits are not saved to Drive.</div>');
+        : `<div class="drive-role-note drive-role-note-viewer">👁 You are a test user — you can take quizzes here, but edits to the quiz library are not saved to Drive. Your own quiz attempts <strong>are</strong> backed up automatically, to a private file (<code>${_escHtml(DRIVE_VIEWER_ATTEMPTS_FILE_NAME)}</code>) in <strong>your own</strong> Google Drive — never to the quiz owner's Drive, and no one else can see it.</div>`);
     title.textContent='Connected'+(_driveAccountEmail?(' — '+_driveAccountEmail):'');
     sub.textContent='Drive is now the master copy of your library. Every change here is pushed to Drive automatically, and this file can be opened from any other browser or device by connecting the same Google account.';
     actions.innerHTML=`
@@ -4676,7 +4694,7 @@ async function driveConnect(){
     _driveSetStatus('syncing','Connecting to your library…');
     await _driveFindOrCreateFileAndHydrate();
     _driveSetStatus('ok','Connected. Your library now lives in Drive.');
-    showShortcutToast(_isAdmin?'Google Drive connected ✓':'Google Drive connected — test mode ✓');
+    showShortcutToast(_isAdmin?'Google Drive connected ✓':'Google Drive connected — your attempts will back up to your own Drive ✓');
   }catch(e){
     console.warn('[drive] connect failed:',e);
     _driveSetStatus('err','Could not connect: '+e.message);
@@ -4694,9 +4712,11 @@ function driveDisconnect(){
   }catch(_){}
   _driveAccessToken=null;_driveTokenExpiresAt=0;_driveFileId=null;
   _driveConnected=false;_driveAccountEmail=null;_driveLastSyncedAt=null;
+  _driveViewerAttemptsFileId=null;_driveViewerAttemptsKnownModifiedTime=null;
   _updateRoleFromEmail(); // no email known anymore -> fail-safe (viewer, unless ADMIN_EMAILS is empty)
   try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
   clearTimeout(_driveSyncTimer);
+  clearTimeout(_driveViewerAttemptsSyncTimer);
   _driveSetStatus('','Disconnected. Your data stays safe in this browser (IndexedDB) but will no longer sync to Drive.');
   _driveRenderModalUI();
   showShortcutToast('Google Drive disconnected');
@@ -4714,9 +4734,11 @@ function driveSwitchAccount(){
   }catch(_){}
   _driveAccessToken=null;_driveTokenExpiresAt=0;_driveFileId=null;
   _driveConnected=false;_driveAccountEmail=null;_driveLastSyncedAt=null;
+  _driveViewerAttemptsFileId=null;_driveViewerAttemptsKnownModifiedTime=null;
   _updateRoleFromEmail();
   try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
   clearTimeout(_driveSyncTimer);
+  clearTimeout(_driveViewerAttemptsSyncTimer);
   _driveRenderModalUI();
   driveConnect();
 }
@@ -4768,8 +4790,8 @@ async function _driveApiFetch(url,opts){
   return r;
 }
 
-async function _driveFindFile(){
-  const q=encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+async function _driveFindFile(fileName){
+  const q=encodeURIComponent(`name='${fileName||DRIVE_FILE_NAME}' and trashed=false`);
   const r=await _driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)`);
   const j=await r.json();
   return (j.files&&j.files[0])?j.files[0]:null;
@@ -4787,9 +4809,9 @@ async function _driveDownloadFile(fileId){
   return r.json();
 }
 
-async function _driveCreateFile(payload){
+async function _driveCreateFile(payload,fileName){
   const boundary='qbdrive_'+Date.now();
-  const metadata={name:DRIVE_FILE_NAME,mimeType:'application/json'};
+  const metadata={name:fileName||DRIVE_FILE_NAME,mimeType:'application/json'};
   const body=
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`+
     `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(payload)}\r\n`+
@@ -4853,9 +4875,16 @@ async function _driveFindOrCreateFileAndHydrate(){
     const meta=await _driveGetFileMeta(DRIVE_SHARED_FILE_ID); // throws if not accessible
     _driveFileId=DRIVE_SHARED_FILE_ID;
     const payload=await _driveDownloadFile(DRIVE_SHARED_FILE_ID);
-    await _driveHydrateFromPayload(payload);
+    await _driveHydrateFromPayload(payload,{skipAttempts:!_isAdmin});
     _driveKnownModifiedTime=meta&&meta.modifiedTime||null;
     _driveLastSyncedAt=new Date();
+    // Test users: separately find/create their OWN private attempts-backup
+    // file and merge it in. Kept out of the critical path (best-effort) so a
+    // hiccup here never blocks the shared quiz library from loading.
+    if(!_isAdmin){
+      try{ await _driveFindOrCreateViewerAttemptsFileAndHydrate(); }
+      catch(e){ console.warn('[drive] viewer attempts backup init failed:',e); }
+    }
     return;
   }
   const existing=await _driveFindFile();
@@ -4877,16 +4906,22 @@ async function _driveFindOrCreateFileAndHydrate(){
 // payload, then reloads runtime state and re-renders. Preview drafts
 // (STORE_DRAFTS) are intentionally left alone — they're per-browser
 // scratch state, not part of the synced library.
-async function _driveHydrateFromPayload(payload){
+async function _driveHydrateFromPayload(payload,opts){
   if(!payload||typeof payload!=='object')return;
+  // skipAttempts=true is used when a non-admin ("test mode") account hydrates
+  // from the shared library file: that file's `attempts` array is the
+  // ADMIN's own attempt history, not this account's. Non-admins keep their
+  // local attempts untouched here — their own history now lives in a
+  // separate private Drive file instead (see DRIVE_VIEWER_ATTEMPTS_FILE_NAME).
+  const skipAttempts=!!(opts&&opts.skipAttempts);
   _driveHydrating=true;
   try{
     const formsArr=Array.isArray(payload.forms)?payload.forms:[];
-    const attemptsArr=Array.isArray(payload.attempts)?payload.attempts:[];
+    const attemptsArr=skipAttempts?attempts:(Array.isArray(payload.attempts)?payload.attempts:[]);
     const questionsArr=Array.isArray(payload.questions)?payload.questions:[];
     const groupsArr=Array.isArray(payload.groups)?payload.groups:[];
     await _dbPutAllRaw(STORE_FORMS,formsArr);
-    await _dbPutAllRaw(STORE_ATTEMPTS,attemptsArr);
+    if(!skipAttempts) await _dbPutAllRaw(STORE_ATTEMPTS,attemptsArr);
     await _dbPutAllRaw(STORE_QUESTIONS,questionsArr);
     STATE.groups=groupsArr;
     try{localStorage.setItem('qb_groups',JSON.stringify(groupsArr));}catch(_){}
@@ -4916,16 +4951,119 @@ async function buildLibraryPayload(){
   };
 }
 
+// Combines two attempt arrays, deduping by attempt id. Local wins on a
+// clash (it's the freshest copy for whichever device/tab is running right
+// now); anything present only on the remote side (e.g. attempts recorded on
+// a different device) is kept too, so nothing already backed up ever
+// silently disappears just because this session hasn't seen it yet.
+function _mergeAttemptsById(localArr,remoteArr){
+  const byId=new Map();
+  (Array.isArray(remoteArr)?remoteArr:[]).forEach(a=>{if(a&&a.id!=null)byId.set(a.id,a);});
+  (Array.isArray(localArr)?localArr:[]).forEach(a=>{if(a&&a.id!=null)byId.set(a.id,a);});
+  return Array.from(byId.values());
+}
+
+// Same shape as buildLibraryPayload(), but scoped to just this account's own
+// attempts — this is all a non-admin's private backup file ever contains.
+function _driveBuildViewerAttemptsPayload(){
+  return {
+    _version:1,
+    _exported:new Date().toISOString(),
+    _app:'QuizBuilder',
+    _scope:'viewer-attempts-only',
+    attempts:JSON.parse(JSON.stringify(attempts)),
+  };
+}
+
+// Non-admin ("test mode") accounts only have read access to the shared
+// library file (see DRIVE_SHARED_FILE_ID), so they can never write their own
+// quiz attempts into it. This finds — or creates — a SEPARATE file this app
+// owns in the signed-in test user's OWN Drive, private to them, merges
+// whatever's already there with whatever's local, and leaves both sides in
+// sync. Never called for admins (they keep using the shared library file).
+async function _driveFindOrCreateViewerAttemptsFileAndHydrate(){
+  if(_isAdmin)return;
+  const existing=await _driveFindFile(DRIVE_VIEWER_ATTEMPTS_FILE_NAME);
+  let remoteAttempts=[];
+  if(existing){
+    _driveViewerAttemptsFileId=existing.id;
+    _driveViewerAttemptsKnownModifiedTime=existing.modifiedTime||null;
+    const payload=await _driveDownloadFile(existing.id);
+    remoteAttempts=Array.isArray(payload&&payload.attempts)?payload.attempts:[];
+  }
+  const merged=_mergeAttemptsById(attempts,remoteAttempts);
+  const changed=merged.length!==attempts.length ||
+    JSON.stringify(merged.map(a=>a.id).sort())!==JSON.stringify(attempts.map(a=>a.id).sort());
+  if(changed){
+    setState({attempts:merged});
+    try{ await _dbPutAllRaw(STORE_ATTEMPTS,merged); }
+    catch(e){ console.warn('_driveFindOrCreateViewerAttemptsFileAndHydrate: local save failed:',e); }
+    updateAttemptsCounts();
+    const modal=document.getElementById('attempts-modal');
+    if(modal&&modal.style.display==='flex')renderAttemptsModal();
+  }
+  if(!existing){
+    const payload=_driveBuildViewerAttemptsPayload();
+    _driveViewerAttemptsFileId=await _driveCreateFile(payload,DRIVE_VIEWER_ATTEMPTS_FILE_NAME);
+    const created=await _driveGetFileMeta(_driveViewerAttemptsFileId);
+    _driveViewerAttemptsKnownModifiedTime=created&&created.modifiedTime||null;
+  } else if(changed){
+    // Push the merged set straight back so both sides agree immediately
+    // rather than waiting for the next debounced sync.
+    await _driveUpdateFile(_driveViewerAttemptsFileId,_driveBuildViewerAttemptsPayload(),true);
+    const refreshed=await _driveGetFileMeta(_driveViewerAttemptsFileId).catch(()=>null);
+    _driveViewerAttemptsKnownModifiedTime=refreshed&&refreshed.modifiedTime||_driveViewerAttemptsKnownModifiedTime;
+  }
+}
+
+// Debounced push of just this account's own attempts to their private
+// backup file. Mirrors _drivePushToDrive()'s shape but never touches the
+// shared library file, and — since nobody else can write to this file — has
+// no conflict window to guard against, so every write uses force=true.
+async function _drivePushViewerAttemptsToDrive(){
+  if(!_driveConnected||_isAdmin)return;
+  if(_driveViewerAttemptsPushInFlight){_driveViewerAttemptsPushQueuedAgain=true;return;}
+  _driveViewerAttemptsPushInFlight=true;
+  _driveSetStatus('syncing','Backing up your attempts…');
+  try{
+    const payload=_driveBuildViewerAttemptsPayload();
+    if(!_driveViewerAttemptsFileId){
+      const existing=await _driveFindFile(DRIVE_VIEWER_ATTEMPTS_FILE_NAME);
+      _driveViewerAttemptsFileId=existing?existing.id:await _driveCreateFile(payload,DRIVE_VIEWER_ATTEMPTS_FILE_NAME);
+    }
+    if(_driveViewerAttemptsFileId){
+      await _driveUpdateFile(_driveViewerAttemptsFileId,payload,true);
+    }
+    _driveLastSyncedAt=new Date();
+    _driveSetStatus('ok','');
+    _driveUpdateLastSyncedLabel();
+  }catch(e){
+    console.warn('[drive] viewer attempts sync failed:',e);
+    _driveSetStatus('err','Attempt backup failed — will retry on the next change. ('+e.message+')');
+  }finally{
+    _driveViewerAttemptsPushInFlight=false;
+    if(_driveViewerAttemptsPushQueuedAgain){_driveViewerAttemptsPushQueuedAgain=false;_drivePushViewerAttemptsToDrive();}
+  }
+}
+
 // Debounced push of the whole library to Drive. Called automatically after
 // every local write (see the dbPutAll/dbPutOne/dbDeleteOne wrappers above).
 // Pass `immediate=true` for the manual "Sync now" button.
 function scheduleDriveSync(immediate){
   if(!_driveConnected||_driveHydrating)return;
-  // Non-admins (in shared-library mode) only have read access to the
-  // library file — quietly skip the push instead of spamming failed API
-  // calls. Their own local IndexedDB cache (e.g. their quiz attempts)
-  // still works fine; it just isn't the thing being synced to Drive here.
-  if(!_isAdmin && DRIVE_SHARED_FILE_ID)return;
+  // Non-admins (in shared-library mode) only have read access to the shared
+  // library file — routing a write there would just fail. Their attempts
+  // still need backing up somewhere, though, so route those to their own
+  // private file instead (see _drivePushViewerAttemptsToDrive above). Any
+  // other local changes for a non-admin (there shouldn't be any editing
+  // controls reachable to produce them) are intentionally NOT pushed
+  // anywhere, same as before.
+  if(!_isAdmin && DRIVE_SHARED_FILE_ID){
+    clearTimeout(_driveViewerAttemptsSyncTimer);
+    if(immediate){_drivePushViewerAttemptsToDrive();return;}
+    _driveViewerAttemptsSyncTimer=setTimeout(_drivePushViewerAttemptsToDrive,DRIVE_SYNC_DEBOUNCE_MS);
+    return;
+  }
   clearTimeout(_driveSyncTimer);
   if(immediate){_drivePushToDrive();return;}
   _driveSyncTimer=setTimeout(_drivePushToDrive,DRIVE_SYNC_DEBOUNCE_MS);
@@ -5300,7 +5438,9 @@ function updateMobileMenu(){
     [[true,'Save & Exit',()=>{closeMobileMenu();saveAndGoBack();}],[false,'▶ Preview',()=>{closeMobileMenu();switchTab('preview');}]].forEach(([prim,txt,fn])=>{
       const b=document.createElement('button');b.className='mobile-action-btn'+(prim?' primary':'');b.textContent=txt;b.addEventListener('click',fn);acts.appendChild(b);});
   }else{
-    [[true,'+ New Form',()=>{closeMobileMenu();createNewForm();}],[false,'⏱ My Attempts',()=>{closeMobileMenu();openAttemptsModal();}]].forEach(([prim,txt,fn])=>{
+    const dashActions=[[true,'+ New Form',()=>{closeMobileMenu();createNewForm();}]];
+    if(_isAdmin)dashActions.push([false,'⏱ My Attempts',()=>{closeMobileMenu();openAttemptsModal();}]);
+    dashActions.forEach(([prim,txt,fn])=>{
       const b=document.createElement('button');b.className='mobile-action-btn'+(prim?' primary':'');b.textContent=txt;b.addEventListener('click',fn);acts.appendChild(b);});
   }
 }
@@ -5353,7 +5493,14 @@ function getFormAttemptCount(fid){return attempts.filter(a=>a.formId===fid).leng
 function getFormBestScore(fid){const fa=attempts.filter(a=>a.formId===fid&&a.score!=null);return fa.length?Math.max(...fa.map(a=>a.score)):null;}
 function updateAttemptsCounts(){const cnt=attempts.length;['topbar-attempts-count','dash-attempts-count'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent=cnt;el.style.display=cnt>0?'':'none';}});}
 
-function openAttemptsModal(){renderAttemptsModal();document.getElementById('attempts-modal').style.display='flex';}
+// Attempt History is admin-only (see §ROLE) — every button that opens it is
+// hidden for test-mode accounts via the .admin-only CSS rule, but this
+// function-level guard is kept as defense-in-depth against any leftover
+// entry point (e.g. a stray keyboard shortcut or a call from the console).
+function openAttemptsModal(){
+  if(!_isAdmin)return;
+  renderAttemptsModal();document.getElementById('attempts-modal').style.display='flex';
+}
 function closeAttemptsModal(){document.getElementById('attempts-modal').style.display='none';}
 function handleAttemptsOverlayClick(e){if(e.target===document.getElementById('attempts-modal'))closeAttemptsModal();}
 
@@ -5963,7 +6110,7 @@ function _buildFormCard(f, _attByForm){
   editBtn.addEventListener('click',()=>{ _folderViewOrigin=_folderViewId; openForm(f.id); });
   const testBtn=document.createElement('button');testBtn.className='fc-action test-btn';testBtn.textContent='▶ Test';testBtn.addEventListener('click',()=>{ _folderViewOrigin=_folderViewId; testForm(f.id); });
   const dupBtn=document.createElement('button');dupBtn.className='fc-action admin-only';dupBtn.textContent='⧉ Duplicate';dupBtn.addEventListener('click',()=>duplicateForm(f.id));
-  const histBtn=document.createElement('button');histBtn.className='fc-action';histBtn.textContent='⏱ History';histBtn.addEventListener('click',e=>{e.stopPropagation();viewFormAttempts(f.id);});
+  const histBtn=document.createElement('button');histBtn.className='fc-action admin-only';histBtn.textContent='⏱ History';histBtn.addEventListener('click',e=>{e.stopPropagation();viewFormAttempts(f.id);});
   const expBtn=document.createElement('button');expBtn.className='fc-action export-btn admin-only';expBtn.textContent='↓ Export';expBtn.title='Export this quiz as .json';expBtn.setAttribute('aria-label','Export '+f.title+' as JSON');expBtn.addEventListener('click',()=>exportSingleForm(f.id));
   const shareBtn=document.createElement('button');shareBtn.className='fc-action js-share-btn admin-only';shareBtn.textContent='↗ Share';shareBtn.title='Share or export this form';shareBtn.setAttribute('aria-label','Share or export '+f.title);shareBtn.addEventListener('click',e=>{e.stopPropagation();openShareModal(f.id);});
   // ── Group picker button ──────────────────────────────────────────────────────
@@ -6434,7 +6581,7 @@ function _renderFolderBreadcrumb(g, formCount){
   actions.style.cssText='display:flex;gap:8px;align-items:center';
 
   const attBtn=document.createElement('button');
-  attBtn.className='btn-attempts';
+  attBtn.className='btn-attempts admin-only';
   attBtn.style.cssText='background:var(--purple-dim);color:var(--purple);border-color:var(--border)';
   _setSafeInnerHTML(attBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> My Attempts <span class="attempts-count-badge" id="dash-attempts-count" style="display:none;background:var(--purple)">0</span>');
   attBtn.addEventListener('click', openAttemptsModal);
@@ -6494,7 +6641,7 @@ function _restoreRootDashHeader(){
   right.style.cssText='display:flex;gap:8px;align-items:center';
 
   const attBtn=document.createElement('button');
-  attBtn.className='btn-attempts';
+  attBtn.className='btn-attempts admin-only';
   attBtn.style.cssText='background:var(--purple-dim);color:var(--purple);border-color:var(--border)';
   _setSafeInnerHTML(attBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> My Attempts <span class="attempts-count-badge" id="dash-attempts-count" style="display:none;background:var(--purple)">0</span>');
   attBtn.addEventListener('click', openAttemptsModal);
@@ -6951,7 +7098,7 @@ function saveAndGoBack(){
   document.getElementById('topbar-tabs').style.display='none';
   (function(){
     const tr=document.getElementById('topbar-right');tr.innerHTML='';
-    const histBtn=document.createElement('button');histBtn.className='btn-attempts';histBtn.id='topbar-attempts-btn';
+    const histBtn=document.createElement('button');histBtn.className='btn-attempts admin-only';histBtn.id='topbar-attempts-btn';
     _setSafeInnerHTML(histBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>');
     histBtn.appendChild(document.createTextNode('History'));
     const cntBadge=document.createElement('span');cntBadge.className='attempts-count-badge';cntBadge.id='topbar-attempts-count';cntBadge.style.display='none';cntBadge.textContent='0';
@@ -8788,11 +8935,30 @@ function renderPreview(){
       successCard.appendChild(reviewContainer);
     }
     const againBtn=document.createElement('button');againBtn.className='success-again';againBtn.textContent='Submit Another Response';againBtn.addEventListener('click',resetPreview);
-    const histLink=document.createElement('button');histLink.className='success-attempts-link';histLink.textContent='View all my attempts →';histLink.addEventListener('click',openAttemptsModal);
+    // Admins get the normal "View all my attempts" link into the Attempt
+    // History modal. Test-mode (non-admin) users never see that modal at
+    // all (§ROLE / admin-only hides every entry point into it) — instead,
+    // if their attempt is actually being backed up to Drive right now, tell
+    // them so in plain language. If Drive isn't connected, or this
+    // deployment doesn't use a shared library file, say nothing rather than
+    // promising a backup that isn't happening.
+    let histLink=null;
+    if(_isAdmin){
+      histLink=document.createElement('button');
+      histLink.className='success-attempts-link';
+      histLink.textContent='View all my attempts →';
+      histLink.addEventListener('click',openAttemptsModal);
+    } else if(_driveConnected && DRIVE_SHARED_FILE_ID){
+      histLink=document.createElement('div');
+      histLink.className='success-attempts-link';
+      histLink.style.cssText='cursor:default;text-decoration:none';
+      histLink.textContent='📁 This result is backed up privately to your own Google Drive.';
+    }
     const shareBtn=document.createElement('button');shareBtn.className='success-share-btn';
     shareBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Share Results';
     shareBtn.addEventListener('click',()=>shareResults(sc,title));
-    successCard.append(againBtn,shareBtn,histLink);
+    successCard.append(againBtn,shareBtn);
+    if(histLink)successCard.appendChild(histLink);
     wrap.innerHTML='';wrap.appendChild(successCard);
     return;
   }
