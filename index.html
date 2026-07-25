@@ -76,6 +76,39 @@ body.role-viewer .role-viewer-only{display:block}
 .role-badge{display:none;align-items:center;font-size:11px;font-weight:600;letter-spacing:.2px;padding:3px 9px;border-radius:20px;margin-left:8px;white-space:nowrap}
 .role-badge-admin{background:rgba(255,255,255,.18);color:#fff}
 .role-badge-viewer{background:#ffca28;color:#3d2c00}
+/* §DRIVE-PILL — persistent Drive sync/status indicator that lives in the
+   app-shell topbar (.topbar never unmounts between views), so it stays
+   visible on the dashboard, inside folders, in the form builder, and while
+   taking/previewing a quiz — unlike #dash-drive-btn, which only exists on
+   the dashboard screen. Both stay in sync: _driveSetStatus() updates them
+   together. See _driveSetStatus() / _driveUpdateLastSyncedLabel(). */
+.topbar-drive-pill{display:flex;align-items:center;gap:6px;margin-left:6px;padding:4px 10px;border-radius:20px;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#fff;font-size:11px;font-weight:600;letter-spacing:.15px;white-space:nowrap;cursor:pointer;flex-shrink:0;line-height:1.25;font-family:inherit;transition:background .15s ease,border-color .15s ease}
+.topbar-drive-pill:hover{background:rgba(255,255,255,.2)}
+.topbar-drive-pill:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.topbar-drive-pill-icon{width:13px;height:13px;flex-shrink:0;opacity:.9}
+.topbar-drive-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.5);flex-shrink:0}
+.topbar-drive-pill-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
+.topbar-drive-pill-sub{font-size:9.5px;font-weight:500;color:rgba(255,255,255,.75);letter-spacing:.1px}
+.topbar-drive-pill.drive-on .topbar-drive-dot{background:#66bb6a}
+.topbar-drive-pill.drive-syncing .topbar-drive-dot{background:#ffca28;animation:driveDotPulse 1s ease-in-out infinite}
+.topbar-drive-pill.drive-err .topbar-drive-dot{background:#ef5350}
+@keyframes driveDotPulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(max-width:499px){.topbar-drive-pill-sub{display:none}.topbar-drive-pill{padding:4px 8px}}
+@media(max-width:400px){.topbar-drive-pill-text{display:none}.topbar-drive-pill{padding:6px;gap:4px}}
+/* §DRIVE-RECONNECT-BANNER — shown when a returning admin/test-user's silent
+   Google sign-in fails on page load (see driveTryAutoReconnect()'s catch
+   block), which is the moment a refresh "loses" their session. Local data
+   is never lost when this happens (IndexedDB keeps it) — only the Drive
+   sync itself pauses until they reconnect, which this banner makes obvious
+   instead of leaving people to notice only via the small topbar pill. */
+#drive-reconnect-banner{display:none;align-items:center;gap:10px;font-size:12.5px;line-height:1.5;color:#7a4a00;background:#fff3e0;border-bottom:1px solid #ffcc80;padding:9px 16px}
+#drive-reconnect-banner svg{width:16px;height:16px;flex-shrink:0}
+#drive-reconnect-banner .drive-reconnect-banner-actions{display:flex;gap:8px;margin-left:auto;flex-shrink:0}
+#drive-reconnect-banner button{border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;padding:5px 12px;font-family:inherit}
+#drive-reconnect-banner .drive-reconnect-btn{background:#e65100;color:#fff}
+#drive-reconnect-banner .drive-reconnect-btn:hover{background:#c34700}
+#drive-reconnect-banner .drive-reconnect-dismiss{background:transparent;color:#7a4a00;padding:5px 8px;font-size:16px;line-height:1}
+@media(max-width:600px){#drive-reconnect-banner{flex-wrap:wrap}#drive-reconnect-banner .drive-reconnect-banner-actions{margin-left:0;width:100%}}
 .drive-role-note{font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border-light);border-radius:8px;padding:8px 10px;margin-top:10px;line-height:1.5}
 .drive-role-note-admin{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
 .drive-role-note-viewer{color:#8a6100;background:#fff8e1;border-color:#ffe082}
@@ -2682,6 +2715,14 @@ button,
         <span class="topbar-title" id="topbar-form-title">My Forms</span>
       </div>
       <span class="role-badge" id="role-badge" style="display:none"></span>
+      <button type="button" class="topbar-drive-pill" id="topbar-drive-pill" onclick="openLibModal('drive')" title="Drive: Off" aria-label="Google Drive sync status: not connected. Click for details.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="topbar-drive-pill-icon" aria-hidden="true"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span class="topbar-drive-dot" id="topbar-drive-dot" aria-hidden="true"></span>
+        <span class="topbar-drive-pill-text">
+          <span id="topbar-drive-pill-main">Drive: Off</span>
+          <span class="topbar-drive-pill-sub" id="topbar-drive-pill-sub"></span>
+        </span>
+      </button>
     </div>
     <div class="topbar-tabs" id="topbar-tabs" style="display:none">
       <button class="tab-btn active admin-only" id="tab-questions" onclick="switchTab('questions')">Questions</button>
@@ -2721,6 +2762,20 @@ button,
   <div id="integrity-banner" role="note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
     <span><strong>Test mode.</strong> This session is monitored. Copying, redistributing, or otherwise reproducing this application's code, or reproducing/sharing this test's content, is prohibited and may result in your access being revoked without notice.</span>
+  </div>
+
+  <!-- §DRIVE-RECONNECT-BANNER — see _driveShowReconnectBanner()/
+       _driveHideReconnectBanner() in the Drive module. Shown when a
+       previously-connected account's silent Google sign-in fails on load
+       (e.g. after a refresh), which is otherwise easy to miss since the
+       only other signal is the small topbar pill flipping to "Error". -->
+  <div id="drive-reconnect-banner" role="alert">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+    <span id="drive-reconnect-banner-text">You've been signed out of Google Drive. Your work is still saved in this browser, but it won't sync to Drive until you reconnect.</span>
+    <div class="drive-reconnect-banner-actions">
+      <button type="button" class="drive-reconnect-btn" onclick="driveConnect()">Reconnect</button>
+      <button type="button" class="drive-reconnect-dismiss" onclick="_driveHideReconnectBanner()" aria-label="Dismiss">×</button>
+    </div>
   </div>
 
   <!-- Mobile slide-down menu -->
@@ -4729,6 +4784,23 @@ function _driveSetStatus(kind,msg){
     else if(_driveConnected){pill.classList.add('drive-on');label.textContent='Drive: On';}
     else{label.textContent='Drive: Off';}
   }
+  // Persistent topbar pill — same state as the dashboard pill above, but
+  // lives in .topbar (the app shell, which never unmounts), so it stays
+  // visible on every screen: dashboard, folders, builder, and quiz preview.
+  const topPill=document.getElementById('topbar-drive-pill');
+  const topMain=document.getElementById('topbar-drive-pill-main');
+  if(topPill&&topMain){
+    topPill.classList.remove('drive-on','drive-syncing','drive-err');
+    let statusText,ariaText;
+    if(kind==='syncing'){topPill.classList.add('drive-syncing');statusText='Drive: Syncing…';ariaText='syncing';}
+    else if(kind==='err'){topPill.classList.add('drive-err');statusText='Drive: Error';ariaText='error — click to reconnect';}
+    else if(_driveConnected){topPill.classList.add('drive-on');statusText='Drive: On';ariaText='connected';}
+    else{statusText='Drive: Off';ariaText='not connected';}
+    topMain.textContent=statusText;
+    topPill.title=statusText;
+    topPill.setAttribute('aria-label','Google Drive sync status: '+ariaText+'. Click for details.');
+  }
+  _driveUpdateLastSyncedLabel();
 }
 
 function _driveRenderModalUI(){
@@ -4754,6 +4826,10 @@ function _driveRenderModalUI(){
       <button class="btn-lib-export admin-only" onclick="scheduleDriveSync(true)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="icon-sm" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         Sync now
+      </button>
+      <button class="btn-lib-export outline" onclick="_driveRefreshFromDrive()" title="Pull the latest saved version from Drive, replacing this browser's local copy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="icon-sm" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        Refresh from Drive
       </button>
       <button class="btn-lib-export outline" onclick="driveSwitchAccount()" title="Sign in with a different Google account">Switch Account</button>
       <button class="btn-lib-export outline" onclick="driveDisconnect()">Disconnect</button>
@@ -4812,8 +4888,30 @@ async function _driveSaveRevokedEmails(){
 let _driveLastSyncedAt=null;
 function _driveUpdateLastSyncedLabel(){
   const el=document.getElementById('drive-last-synced');
-  if(!el)return;
-  el.textContent=_driveLastSyncedAt?('Last synced '+_driveRelativeTime(_driveLastSyncedAt)):'';
+  if(el)el.textContent=_driveLastSyncedAt?('Last synced '+_driveRelativeTime(_driveLastSyncedAt)):'';
+  // "Saved 6:36 PM" line under the persistent topbar pill — a clock-time
+  // stamp (rather than the modal's relative "2m ago" wording) so it reads
+  // correctly even if the person doesn't look at it again for a while.
+  const sub=document.getElementById('topbar-drive-pill-sub');
+  if(sub)sub.textContent=(_driveConnected&&_driveLastSyncedAt)?('Saved '+_driveFormatClockTime(_driveLastSyncedAt)):'';
+}
+function _driveFormatClockTime(date){
+  try{ return date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+  catch(_){ return ''; }
+}
+// §DRIVE-RECONNECT-BANNER — see the CSS block of the same name and the
+// markup right after #integrity-banner. Shown only when a previously
+// connected session's silent reconnect fails (driveTryAutoReconnect()'s
+// catch branch) — i.e. exactly the moment a page refresh "loses" sign-in —
+// so the gap is obvious instead of the only clue being the topbar pill
+// quietly flipping to "Error".
+function _driveShowReconnectBanner(){
+  const banner=document.getElementById('drive-reconnect-banner');
+  if(banner)banner.style.display='flex';
+}
+function _driveHideReconnectBanner(){
+  const banner=document.getElementById('drive-reconnect-banner');
+  if(banner)banner.style.display='none';
 }
 function _driveRelativeTime(date){
   const s=Math.round((Date.now()-date.getTime())/1000);
@@ -4892,6 +4990,7 @@ async function driveConnect(){
     await _updateRoleFromEmail();
     _driveConnected=true;
     try{localStorage.setItem(DRIVE_TOKEN_LS_KEY,'1');}catch(_){}
+    _driveHideReconnectBanner();
     _driveSetStatus('syncing','Connecting to your library…');
     await _driveFindOrCreateFileAndHydrate();
     _driveSetStatus('ok','Connected. Your library now lives in Drive.');
@@ -4918,6 +5017,7 @@ function driveDisconnect(){
   try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
   clearTimeout(_driveSyncTimer);
   clearTimeout(_driveViewerAttemptsSyncTimer);
+  _driveHideReconnectBanner();
   _driveSetStatus('','Disconnected. Your data stays safe in this browser (IndexedDB) but will no longer sync to Drive.');
   _driveRenderModalUI();
   showShortcutToast('Google Drive disconnected');
@@ -4974,6 +5074,13 @@ async function driveTryAutoReconnect(){
     _driveAccountEmail=null;
     _updateRoleFromEmail(); // fail safe back to viewer rather than leaving a stale admin flag set
     _driveSetStatus('err','Signed out of Drive — reconnect from Export / Import → Google Drive.');
+    // This IS the "refresh wiped my sign-in" moment: a prior session existed
+    // (wasConnected was true above) but Google's silent token refresh
+    // didn't come back — most commonly because the browser blocks the
+    // third-party cookie accounts.google.com's silent-auth iframe relies
+    // on (Safari ITP, Chrome's third-party-cookie phase-out, private/
+    // incognito windows). Local data is untouched; only Drive sync paused.
+    _driveShowReconnectBanner();
   }
   _driveRenderModalUI();
 }
@@ -5140,6 +5247,41 @@ async function _driveHydrateFromPayload(payload,opts){
     }
   } finally {
     _driveHydrating=false;
+  }
+}
+
+// Manual "Refresh from Drive" — re-downloads the current library file on
+// demand and replaces the local copy, instead of waiting for the next
+// natural sync/reconnect. Read-only against Drive (never writes), so it's
+// safe for both admins and test users — unlike "Sync now", which is
+// admin-only because it pushes. Exposed from the Drive modal, which is
+// itself reachable from the persistent topbar pill on every screen.
+async function _driveRefreshFromDrive(){
+  if(!_driveConnected){showShortcutToast('Connect Google Drive first');return;}
+  const fileId=(!_isAdmin&&DRIVE_SHARED_FILE_ID)?DRIVE_SHARED_FILE_ID:_driveFileId;
+  if(!fileId){showShortcutToast('No Drive file to refresh from yet');return;}
+  if(!confirm('This replaces your local copy with the version currently saved in Drive. Any change made in the last few seconds that has not synced yet could be overwritten. Continue?'))return;
+  _driveSetStatus('syncing','Refreshing from Drive…');
+  try{
+    const meta=await _driveGetFileMeta(fileId);
+    const payload=await _driveDownloadFile(fileId);
+    if(!_isAdmin && await _isEmailRevoked(_driveAccountEmail)){_showAccessRevokedGate();return;}
+    await _driveHydrateFromPayload(payload,{skipAttempts:!_isAdmin});
+    _driveKnownModifiedTime=(meta&&meta.modifiedTime)||_driveKnownModifiedTime;
+    _driveConflictPending=false;
+    // Hydrating only refreshes IndexedDB + the dashboard list (see
+    // _driveHydrateFromPayload) — if a form is open in the builder right
+    // now, its in-memory state is still the old copy, so reload it too.
+    const builderOpen=document.getElementById('builder-view')&&document.getElementById('builder-view').style.display==='block';
+    if(builderOpen && STATE.currentFormId!=null){
+      if(_isAdmin)await openForm(STATE.currentFormId);else await testForm(STATE.currentFormId);
+    }
+    _driveLastSyncedAt=new Date();
+    _driveSetStatus('ok','Refreshed from Drive.');
+    showShortcutToast('Refreshed from Drive ✓');
+  }catch(e){
+    console.warn('[drive] manual refresh failed:',e);
+    _driveSetStatus('err','Refresh failed: '+e.message);
   }
 }
 
