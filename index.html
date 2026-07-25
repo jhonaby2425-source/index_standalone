@@ -4208,9 +4208,16 @@ const DRIVE_CLIENT_ID = '685955252889-efh55bll8irll4086nnpkapen9cqfnb2.apps.goog
 // to write the library). drive.readonly: lets ANY signed-in account read a
 // file it has been given "Viewer" access to in Drive, even if this app
 // didn't create it — that's what lets test users read the admin's shared
-// library below. Both scopes together are still far narrower than full
-// Drive access.
-const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
+// library below. 'email' is required too: _driveFetchAccountEmail() calls
+// https://www.googleapis.com/oauth2/v3/userinfo to find out which account
+// just signed in (so it can be checked against ADMIN_EMAILS) — WITHOUT
+// 'email' in scope, that call 401s for every single account, admin
+// included, driveConnect() then can't verify anyone's identity and aborts
+// before _driveConnected is ever set — which looks exactly like "nobody,
+// not even the admin, can sign in or sync," even though the popup itself
+// worked and a token was actually granted. All three scopes together are
+// still far narrower than full Drive access.
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly email';
 const DRIVE_FILE_NAME = 'quizbuilder_library.json';
 // §VIEWER-ATTEMPTS-BACKUP — non-admin ("test mode") accounts only ever get
 // Viewer access to the shared library file above, so they can never write
