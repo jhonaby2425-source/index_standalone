@@ -3676,14 +3676,20 @@ const _setSafeInnerHTML = _setSafeHTML;
  * @param {string} escapedHtml  Text that has ALREADY been HTML-escaped.
  * @returns {string} HTML with bracketed hints replaced by spoiler spans.
  */
+// Matches either legacy [bracketed] hint syntax, or a parenthetical
+// "(Clue: ...)" annotation (case-insensitive, tolerant of extra spacing) —
+// e.g. "...su identidad. (Clue: Select the verb that means to authenticate
+// user credentials.)". Both forms get masked identically.
+const CLUE_PATTERN_RE = /\[([^\[\]]+)\]|\(\s*clue\s*:[^)]*\)/gi;
+
 function _spoilerize(escapedHtml) {
   if (!escapedHtml) return '';
-  return escapedHtml.replace(/\[([^\[\]]+)\]/g, (_m, inner) =>
+  return escapedHtml.replace(CLUE_PATTERN_RE, (m) =>
     `<span class="p-spoiler" data-revealed="false" role="button" tabindex="0" `+
     `aria-pressed="false" aria-label="Hidden hint, tap to reveal" `+
     `onclick="toggleSpoiler(this)" `+
     `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSpoiler(this);}">`+
-    `[${inner}]</span>`
+    `${m}</span>`
   );
 }
 
@@ -9511,11 +9517,14 @@ function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 // ── Spoiler-style hints in translation source sentences ─────────────────────
-// Question authors can embed a vocab/grammar hint inline in the source
-// sentence using square brackets, e.g.
+// Question authors can embed a vocab/grammar hint inline using either
+// [bracket] syntax:
 //   "I put my phone on the desk. [poner: to put / sobre: on / escritorio: desk]"
-// Since that bracketed part basically hands the student the answer, it's
-// hidden behind a Telegram-style tap-to-reveal spoiler in the student-facing
+// or a "(Clue: ...)" parenthetical:
+//   "Los usuarios deben ______ su identidad. (Clue: Select the verb that means
+//   to authenticate user credentials.)"
+// Since that hint text basically hands the student the answer, it's hidden
+// behind a Telegram-style tap-to-reveal spoiler in the student-facing
 // preview instead of being shown outright. The plain-text editor (where the
 // teacher writes the sentence) is untouched — only the rendered preview.
 
