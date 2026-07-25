@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+  QuizBuilder — © the project owner. See LICENSE in the repository root for
+  usage terms. This notice is a provenance/attribution marker, not a
+  copy-protection mechanism — see the code-authenticity notes near
+  ADMIN_EMAILS and REVOKED_EMAILS further down for why client-side code
+  can't enforce that on its own.
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -73,6 +80,30 @@ body.role-viewer .role-viewer-only{display:block}
 .drive-role-note-admin{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
 .drive-role-note-viewer{color:#8a6100;background:#fff8e1;border-color:#ffe082}
 .drive-role-note code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px}
+/* §INTEGRITY — test-mode notice banner + hard print block for viewers.
+   See _applyRoleToUI() (renders/shows #integrity-banner) and the
+   `@media print` rule below (blocks Ctrl+P / browser "Print" menu too,
+   not just the in-app Print button, which is separately hidden/guarded
+   in buildPreviewPages()/printQuiz()). */
+body.role-viewer{-webkit-user-select:none;user-select:none}
+body.role-viewer input,body.role-viewer textarea,body.role-viewer select{-webkit-user-select:text;user-select:text}
+#integrity-banner{display:none;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.5;color:#8a6100;background:#fff8e1;border-bottom:1px solid #ffe082;padding:9px 16px}
+body.role-viewer #integrity-banner{display:flex}
+#integrity-banner svg{width:16px;height:16px;flex-shrink:0;margin-top:1px}
+#integrity-banner strong{color:#5c4200}
+.access-revoked-view{position:fixed;inset:0;z-index:6000;background:var(--surface2);display:none;align-items:center;justify-content:center;padding:20px}
+.access-revoked-view.show{display:flex}
+@media print{
+  /* Test-mode/"viewer" accounts can never print or "Save as PDF" — this
+     fires on ANY print trigger (in-app button, Ctrl+P, browser menu),
+     unlike the in-app Print button which is just hidden/disabled for them. */
+  body.role-viewer *{visibility:hidden!important}
+  body.role-viewer::before{
+    content:"Printing is disabled for test-mode accounts.";
+    visibility:visible!important;position:fixed;top:40%;left:0;right:0;
+    text-align:center;font-family:'DM Sans',sans-serif;font-size:16px;color:#000;
+  }
+}
 /* §SHAREGATE — full-screen sign-in wall shown when the page is opened via a
    direct "?form=<id>" share link. Nothing behind it (dashboard/builder) is
    reachable until Google sign-in succeeds AND the signed-in account can
@@ -2683,6 +2714,15 @@ button,
     </div>
   </div>
 
+  <!-- §INTEGRITY — test-mode notice. Only visible when body has class
+       "role-viewer" (see _applyRoleToUI()). Static text lives here; nothing
+       role-specific is computed at render time, so this is safe to leave in
+       the DOM at all times. -->
+  <div id="integrity-banner" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+    <span><strong>Test mode.</strong> This session is monitored. Copying, redistributing, or otherwise reproducing this application's code, or reproducing/sharing this test's content, is prohibited and may result in your access being revoked without notice.</span>
+  </div>
+
   <!-- Mobile slide-down menu -->
   <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileMenu()"></div>
   <div class="mobile-menu" id="mobile-menu">
@@ -2769,6 +2809,22 @@ button,
         <button type="button" onclick="_shareGateSignIn()">Use a different Google account</button>
         <button type="button" id="share-gate-dashboard-btn" style="display:none" onclick="_shareGateGoToDashboard()">Go to all forms</button>
       </div>
+    </div>
+  </div>
+
+  <!-- §INTEGRITY — shown instead of the app when a signed-in test user's
+       email is on the admin-maintained revoked list (see REVOKED_EMAILS /
+       revokedEmails in the Drive module). Sign-out is the only action
+       available; there is no way back into the app for this account until
+       the admin removes them from the list and pushes an updated library. -->
+  <div id="access-revoked-view" class="access-revoked-view" role="alertdialog" aria-modal="true" aria-labelledby="access-revoked-title">
+    <div class="share-gate-card">
+      <div class="share-gate-logo" style="background:var(--red,#c62828)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>
+      </div>
+      <div class="share-gate-title" id="access-revoked-title">Access revoked</div>
+      <div class="share-gate-sub">Your access to this quiz has been revoked by the administrator. If you believe this is a mistake, contact whoever shared this link with you.</div>
+      <button class="share-gate-btn" onclick="_accessRevokedSignOut()">Sign out</button>
     </div>
   </div>
 
@@ -4228,6 +4284,15 @@ const DRIVE_FILE_NAME = 'quizbuilder_library.json';
 // separate from, and invisible to, the admin's shared library. See
 // _driveFindOrCreateViewerAttemptsFileAndHydrate / _drivePushViewerAttemptsToDrive.
 const DRIVE_VIEWER_ATTEMPTS_FILE_NAME = 'quizbuilder_my_attempts.json';
+// By default this file contains each attempt in FULL: score, every answer the
+// test user gave, AND a snapshot of the questions themselves (so the app's
+// own "My Attempts" review screen can show test users what they got right/
+// wrong later). If you'd rather this file hold ONLY the numeric score/date
+// per attempt (e.g. because test users shouldn't retain a copy of question
+// content in their own Drive), set this to true — the in-app "My Attempts"
+// review will then just show the score, with no per-question detail, for
+// anything synced this way.
+const DRIVE_VIEWER_ATTEMPTS_SCORE_ONLY = false;
 const DRIVE_SYNC_DEBOUNCE_MS = 2500;
 const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-reconnect", never the token itself
 
@@ -4307,6 +4372,34 @@ let _driveViewerAttemptsPushQueuedAgain=false;
 // (matches the app's original single-user behavior).
 let _isAdmin = ADMIN_EMAILS.length===0;
 
+// §REVOKE ────────────────────────────────────────────────────────────────────
+// Lets the admin cut off a specific test user's access WITHOUT redeploying
+// code. The list lives inside the shared library payload itself (alongside
+// forms/questions/attempts) — see buildLibraryPayload() and
+// _driveHydrateFromPayload() — so editing it in the admin's Drive modal and
+// letting the normal Drive sync push it out is enough to take effect the
+// next time each test user's client re-hydrates (on load, or their next
+// periodic re-check — see _driveRecheckRevocation). This is a REMOTE,
+// admin-controlled kill switch; it is not, and cannot be, a way to detect or
+// react to someone copying the app's source code (see the code-authenticity
+// notes near ADMIN_EMAILS above for why that isn't something client-side
+// code can ever reliably do).
+let _revokedEmails = [];
+function _isEmailRevoked(email){
+  if(!email || !Array.isArray(_revokedEmails)) return false;
+  const needle = email.trim().toLowerCase();
+  return _revokedEmails.some(e=>typeof e==='string' && e.trim().toLowerCase()===needle);
+}
+function _showAccessRevokedGate(){
+  document.querySelectorAll('.app,#dashboard-view,#share-gate-view').forEach(el=>{ if(el) el.style.display='none'; });
+  const gate=document.getElementById('access-revoked-view');
+  if(gate) gate.classList.add('show');
+}
+async function _accessRevokedSignOut(){
+  try{ await driveDisconnect(); }catch(_){/* best-effort */}
+  location.reload();
+}
+
 function _updateRoleFromEmail(){
   _isAdmin = ADMIN_EMAILS.length===0 ||
     !!(_driveAccountEmail && ADMIN_EMAILS.some(e=>e.trim().toLowerCase()===_driveAccountEmail.trim().toLowerCase()));
@@ -4319,6 +4412,7 @@ function _updateRoleFromEmail(){
 // tab if a non-admin somehow still has the Questions tab open.
 function _applyRoleToUI(){
   document.body.classList.toggle('role-viewer', !_isAdmin);
+  _setViewerCopyDeterrent(!_isAdmin);
   const badge=document.getElementById('role-badge');
   if(badge){
     if(ADMIN_EMAILS.length===0){
@@ -4342,6 +4436,29 @@ function _applyRoleToUI(){
   }
   if(document.getElementById('dashboard-view') && document.getElementById('dashboard-view').style.display!=='none'){
     renderDashboard();
+  }
+}
+
+// Soft deterrent only, scoped to viewer/test-mode accounts: discourages
+// casual right-click-save / select-and-copy of quiz content. It is NOT real
+// protection — anyone can still open DevTools, use "View Source", or read
+// the page's HTML directly, and this code is fully visible to them if they
+// do. It deliberately does NOT touch <input>/<textarea>/<select> so typing
+// and selecting answers still works normally, and it does not degrade
+// screen-reader or keyboard access (those don't depend on mouse selection).
+let _viewerCopyDeterrentHandlers=null;
+function _setViewerCopyDeterrent(enable){
+  if(enable && !_viewerCopyDeterrentHandlers){
+    const isFormField=(el)=>el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+    const onContextMenu=(e)=>{ if(!isFormField(e.target)) e.preventDefault(); };
+    const onCopy=(e)=>{ if(!isFormField(e.target)) e.preventDefault(); };
+    document.addEventListener('contextmenu',onContextMenu);
+    document.addEventListener('copy',onCopy);
+    _viewerCopyDeterrentHandlers={onContextMenu,onCopy};
+  } else if(!enable && _viewerCopyDeterrentHandlers){
+    document.removeEventListener('contextmenu',_viewerCopyDeterrentHandlers.onContextMenu);
+    document.removeEventListener('copy',_viewerCopyDeterrentHandlers.onCopy);
+    _viewerCopyDeterrentHandlers=null;
   }
 }
 
@@ -4583,7 +4700,7 @@ function _driveRenderModalUI(){
     const roleNote = ADMIN_EMAILS.length===0 ? '' :
       (_isAdmin
         ? '<div class="drive-role-note drive-role-note-admin">★ You are an admin — your edits sync to Drive.</div>'
-        : `<div class="drive-role-note drive-role-note-viewer">👁 You are a test user — you can take quizzes here, but edits to the quiz library are not saved to Drive. Your own quiz attempts <strong>are</strong> backed up automatically, to a private file (<code>${_escHtml(DRIVE_VIEWER_ATTEMPTS_FILE_NAME)}</code>) in <strong>your own</strong> Google Drive — never to the quiz owner's Drive, and no one else can see it.</div>`);
+        : `<div class="drive-role-note drive-role-note-viewer">👁 You are a test user — you can take quizzes here, but edits to the quiz library are not saved to Drive. Your own quiz attempts <strong>are</strong> backed up automatically, to a private file (<code>${_escHtml(DRIVE_VIEWER_ATTEMPTS_FILE_NAME)}</code>) in <strong>your own</strong> Google Drive — never to the quiz owner's Drive, and no one else can see it. ${DRIVE_VIEWER_ATTEMPTS_SCORE_ONLY ? 'It contains <strong>scores and dates only</strong> — no answers or question content.' : 'It contains your full answers and a snapshot of each question, so you can review them later.'}</div>`);
     title.textContent='Connected'+(_driveAccountEmail?(' — '+_driveAccountEmail):'');
     sub.textContent='Drive is now the master copy of your library. Every change here is pushed to Drive automatically, and this file can be opened from any other browser or device by connecting the same Google account.';
     actions.innerHTML=`
@@ -4601,7 +4718,17 @@ function _driveRenderModalUI(){
         ? `<div class="drive-role-note" id="drive-fileid-note">File ID for sharing this library with test users: <code id="drive-fileid-code">${_escHtml(_driveFileId)}</code> `
           +`<button class="fc-action" style="padding:2px 8px" onclick="navigator.clipboard&&navigator.clipboard.writeText('${_escHtml(_driveFileId)}');showShortcutToast('File ID copied ✓')">Copy</button>`
           +`<br><span style="opacity:.75">Share it (Viewer) with test users in Drive, then paste it into DRIVE_SHARED_FILE_ID in the source and redeploy.</span></div>`
-        : ''));
+        : '')
+      + (_isAdmin && DRIVE_SHARED_FILE_ID ? `
+        <div class="drive-role-note" id="drive-revoke-note">
+          <strong>Revoke test-user access</strong> — one email per line. Anyone listed here is
+          hard-blocked (shown an "Access revoked" screen) the next time their client re-checks,
+          without needing a redeploy. This does <strong>not</strong> detect or react to someone
+          copying the app's code — see the note above <code>ADMIN_EMAILS</code> in the source for
+          why that isn't something client-side code can reliably do.
+          <textarea id="drive-revoke-emails" rows="3" style="width:100%;margin-top:6px;font-family:'DM Mono',monospace;font-size:11.5px;border:1px solid var(--border-light);border-radius:6px;padding:6px 8px;resize:vertical" placeholder="someone@example.com">${_escHtml((_revokedEmails||[]).join('\n'))}</textarea>
+          <button class="fc-action" style="padding:3px 10px;margin-top:6px" onclick="_driveSaveRevokedEmails()">Save &amp; push to Drive</button>
+        </div>` : ''));
   } else {
     title.textContent='Not connected';
     sub.textContent='Connect a Google account so your entire library lives in your Drive, not just this browser. Once connected, Drive becomes the master copy — this browser keeps a fast local cache and stays in sync automatically.';
@@ -4613,6 +4740,15 @@ function _driveRenderModalUI(){
     `;
   }
   _driveSetStatus(_driveConnected?'ok':'', '');
+}
+
+function _driveSaveRevokedEmails(){
+  if(!_isAdmin)return;
+  const ta=document.getElementById('drive-revoke-emails');
+  if(!ta)return;
+  _revokedEmails=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  scheduleDriveSync(true);
+  showShortcutToast('Revoked-emails list saved — pushing to Drive ✓');
 }
 
 let _driveLastSyncedAt=null;
@@ -4882,6 +5018,11 @@ async function _driveFindOrCreateFileAndHydrate(){
     const meta=await _driveGetFileMeta(DRIVE_SHARED_FILE_ID); // throws if not accessible
     _driveFileId=DRIVE_SHARED_FILE_ID;
     const payload=await _driveDownloadFile(DRIVE_SHARED_FILE_ID);
+    _revokedEmails=Array.isArray(payload&&payload.revokedEmails)?payload.revokedEmails:_revokedEmails;
+    if(!_isAdmin && _isEmailRevoked(_driveAccountEmail)){
+      _showAccessRevokedGate();
+      return;
+    }
     await _driveHydrateFromPayload(payload,{skipAttempts:!_isAdmin});
     _driveKnownModifiedTime=meta&&meta.modifiedTime||null;
     _driveLastSyncedAt=new Date();
@@ -4932,6 +5073,7 @@ async function _driveHydrateFromPayload(payload,opts){
     await _dbPutAllRaw(STORE_QUESTIONS,questionsArr);
     STATE.groups=groupsArr;
     try{localStorage.setItem('qb_groups',JSON.stringify(groupsArr));}catch(_){}
+    if(Array.isArray(payload.revokedEmails)) _revokedEmails=payload.revokedEmails;
     setState({forms:formsArr,attempts:attemptsArr});
     _seedFormId([...formsArr.map(x=>x.id),...attemptsArr.map(x=>x.id)]);
     if(typeof _invalidateSortedForms==='function')_invalidateSortedForms();
@@ -4955,6 +5097,7 @@ async function buildLibraryPayload(){
     questions:allQuestions,
     attempts:JSON.parse(JSON.stringify(attempts)),
     groups:JSON.parse(JSON.stringify(STATE.groups)),
+    revokedEmails:Array.isArray(_revokedEmails)?[..._revokedEmails]:[],
   };
 }
 
@@ -4973,12 +5116,18 @@ function _mergeAttemptsById(localArr,remoteArr){
 // Same shape as buildLibraryPayload(), but scoped to just this account's own
 // attempts — this is all a non-admin's private backup file ever contains.
 function _driveBuildViewerAttemptsPayload(){
+  const attemptsOut = DRIVE_VIEWER_ATTEMPTS_SCORE_ONLY
+    ? attempts.map(a=>({
+        id:a.id, formId:a.formId, formTitle:a.formTitle, date:a.date,
+        score:a.score, earned:a.earned, total:a.total, totalQ:a.totalQ,
+      }))
+    : JSON.parse(JSON.stringify(attempts));
   return {
     _version:1,
     _exported:new Date().toISOString(),
     _app:'QuizBuilder',
-    _scope:'viewer-attempts-only',
-    attempts:JSON.parse(JSON.stringify(attempts)),
+    _scope: DRIVE_VIEWER_ATTEMPTS_SCORE_ONLY ? 'viewer-scores-only' : 'viewer-attempts-only',
+    attempts:attemptsOut,
   };
 }
 
@@ -7021,7 +7170,7 @@ function openForm(id){
     const backBtn=document.createElement('button');backBtn.className='back-btn';backBtn.textContent=_isAdmin?'← All Forms':'← Back';backBtn.addEventListener('click',saveAndGoBack);
     const saveBtn=document.createElement('button');saveBtn.className='btn-white admin-only';saveBtn.textContent='Save & Exit';saveBtn.addEventListener('click',saveAndGoBack);
     const prevBtn=document.createElement('button');prevBtn.className='btn-outline admin-only';prevBtn.textContent='Preview';prevBtn.addEventListener('click',()=>switchTab('preview'));
-    const printBtn=document.createElement('button');printBtn.className='btn-outline';printBtn.title='Print quiz as PDF (all pages)';_setSafeInnerHTML(printBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print');printBtn.addEventListener('click',printQuiz);
+    const printBtn=document.createElement('button');printBtn.className='btn-outline admin-only';printBtn.title='Print quiz as PDF (all pages)';_setSafeInnerHTML(printBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print');printBtn.addEventListener('click',printQuiz);
     const rescoreBtn=document.createElement('button');rescoreBtn.className='btn-outline admin-only';rescoreBtn.title='Re-grade every saved attempt for this form against the current answer key';_setSafeInnerHTML(rescoreBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Rescore');rescoreBtn.addEventListener('click',manualRescoreForm);
     tr.append(urWrap,badge,backBtn,saveBtn,prevBtn,printBtn,rescoreBtn);
   })();
@@ -7250,6 +7399,12 @@ function _hardenedPrint(){
 // Print the quiz (Questions/Preview builder view) as a PDF — used by the
 // builder topbar Print button and the Preview tab's Print buttons.
 function printQuiz(){
+  // Defense-in-depth: the buttons that call this are already hidden for
+  // viewer/test-mode accounts (.admin-only), and the @media print CSS rule
+  // (§INTEGRITY) blocks the OS-level print dialog too, but this stops the
+  // function itself from doing anything if called directly (e.g. from the
+  // browser console) by a signed-in test user.
+  if(!_isAdmin){ showShortcutToast('Printing is disabled for test-mode accounts.'); return; }
   if(document.getElementById('preview-tab').style.display!=='block'){
     switchTab('preview');
   }
@@ -9022,8 +9177,8 @@ function renderPreview(){
   });
 
   if(hmp){html+=`<div class="page-nav-strip page-nav-strip-bottom"><div class="page-nav-buttons"><button class="page-nav-btn" onclick="goToPage(${currentPage-1})" ${currentPage===0?'disabled':''}>← Previous</button>${currentPage<previewPages.length-1?`<button class="page-nav-btn primary" onclick="nextPage()" style="background:${fc};border-color:${fc}">Next →</button>`:`<button class="page-nav-btn primary" onclick="submitPreview()" style="background:${fc};border-color:${fc}">Submit ✓</button>`}</div></div>`;}
-  if(!hmp){html+=`<div class="preview-submit-row"><button class="preview-submit" onclick="submitPreview()" style="background:${fc}">✓ Submit</button><div style="display:flex;gap:8px;align-items:center"><button class="preview-clear" onclick="pausePreview()" title="Save your answers and come back later">💾 Save &amp; Pause</button><button class="preview-clear" onclick="clearPreview()">Clear form</button><button class="preview-clear" onclick="printQuiz()" title="Print all pages as PDF" style="color:var(--purple);font-weight:600">🖨 Print</button></div></div>`;}
-  else{html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:8px;flex-wrap:wrap"><button class="preview-clear" onclick="pausePreview()" title="Save your answers and come back later">💾 Save &amp; Pause</button><div style="display:flex;gap:8px"><button class="preview-clear" onclick="printQuiz()" title="Print all pages as PDF" style="color:var(--purple);font-weight:600">🖨 Print All Pages</button><button class="preview-clear" onclick="clearPreview()">Clear all answers</button></div></div>`;}
+  if(!hmp){html+=`<div class="preview-submit-row"><button class="preview-submit" onclick="submitPreview()" style="background:${fc}">✓ Submit</button><div style="display:flex;gap:8px;align-items:center"><button class="preview-clear" onclick="pausePreview()" title="Save your answers and come back later">💾 Save &amp; Pause</button><button class="preview-clear" onclick="clearPreview()">Clear form</button><button class="preview-clear admin-only" onclick="printQuiz()" title="Print all pages as PDF" style="color:var(--purple);font-weight:600">🖨 Print</button></div></div>`;}
+  else{html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:8px;flex-wrap:wrap"><button class="preview-clear" onclick="pausePreview()" title="Save your answers and come back later">💾 Save &amp; Pause</button><div style="display:flex;gap:8px"><button class="preview-clear admin-only" onclick="printQuiz()" title="Print all pages as PDF" style="color:var(--purple);font-weight:600">🖨 Print All Pages</button><button class="preview-clear" onclick="clearPreview()">Clear all answers</button></div></div>`;}
 
   wrap.innerHTML=html;
   bindPreviewInputEvents();initDragDropPreviews();
