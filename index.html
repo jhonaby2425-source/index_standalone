@@ -4314,9 +4314,37 @@ const DRIVE_TOKEN_LS_KEY = 'qb_drive_was_connected'; // remembers "should auto-r
 //     console warning both remind you of this until you do.
 //   - Everyone else who is signed in can still connect Drive and take any
 //     published quiz; every editing control is hidden and blocked for them.
-const ADMIN_EMAILS = [
-  'jhonaby24@gmail.com',
+//
+//   ⚠️ THIS ARRAY HOLDS HASHES, NOT PLAINTEXT EMAILS. Everything in this
+//   file — this comment, this array, every function below — is downloaded
+//   to and readable by EVERY visitor's browser (signed in or not), the
+//   moment the page loads, via "View Source" or DevTools. That is true of
+//   any purely client-side web app and cannot be prevented; it is not
+//   something this app (or any app shaped like this) can fix. Storing your
+//   real email in plaintext here would publish it to anyone who looks.
+//   Storing a SHA-256 hash instead means the page source only ever contains
+//   something that isn't reversible back to your email at a glance.
+//   IMPORTANT: this raises the bar, it does not make the app secure — the
+//   real security boundary was always Google Drive's OAuth/file-permission
+//   model (see DRIVE_SCOPES / DRIVE_SHARED_FILE_ID below), not this array.
+//   Even a visitor who edits `_isAdmin` to `true` in DevTools only unlocks
+//   this app's UI for them; any actual write to the shared library file
+//   still gets rejected server-side by Google Drive, because their real
+//   OAuth token was never granted Writer access to that file.
+//
+//   To generate your hash: open this deployed page, open the browser
+//   console, and run:
+//       await hashEmailForAdmin('you@example.com')
+//   Paste the hex string it prints into the array below, then remove the
+//   plaintext email from wherever you typed it (browser history, etc).
+const ADMIN_EMAILS = ['ed035fb36ace9271e5d4427bfb136777925d00539fc3dcf394b804c5af0ceb17',
+  // e.g. 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3',
 ];
+async function _sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str.trim().toLowerCase()));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+window.hashEmailForAdmin = _sha256Hex; // console convenience — see comment above
 
 // By default (drive.file scope, no shared file id set below) each Google
 // account that connects gets its OWN private library file in its OWN Drive
@@ -4384,11 +4412,21 @@ let _isAdmin = ADMIN_EMAILS.length===0;
 // react to someone copying the app's source code (see the code-authenticity
 // notes near ADMIN_EMAILS above for why that isn't something client-side
 // code can ever reliably do).
-let _revokedEmails = [];
-function _isEmailRevoked(email){
-  if(!email || !Array.isArray(_revokedEmails)) return false;
-  const needle = email.trim().toLowerCase();
-  return _revokedEmails.some(e=>typeof e==='string' && e.trim().toLowerCase()===needle);
+// revokedEmails (both in _revokedEmails and in the synced Drive payload)
+// stores SHA-256 hashes, same reasoning as ADMIN_EMAILS above: every test
+// user with Drive access downloads this shared file to check their own
+// status, so plaintext entries here would hand every test user a readable
+// list of every OTHER test user's email too. Hashing means each client can
+// only check "is MY email's hash on this list", not read anyone else's.
+// The admin's own plaintext list (for editing convenience in the Drive
+// modal) is cached separately, in THIS BROWSER's localStorage only — it is
+// never synced to Drive and never visible to test users.
+let _revokedEmails = []; // hashes
+const REVOKED_EMAILS_PLAINTEXT_CACHE_KEY = 'qb_revoked_emails_plaintext_admin_cache';
+async function _isEmailRevoked(email){
+  if(!email || !Array.isArray(_revokedEmails) || !_revokedEmails.length) return false;
+  const hash = await _sha256Hex(email);
+  return _revokedEmails.includes(hash);
 }
 function _showAccessRevokedGate(){
   document.querySelectorAll('.app,#dashboard-view,#share-gate-view').forEach(el=>{ if(el) el.style.display='none'; });
@@ -4400,9 +4438,17 @@ async function _accessRevokedSignOut(){
   location.reload();
 }
 
-function _updateRoleFromEmail(){
-  _isAdmin = ADMIN_EMAILS.length===0 ||
-    !!(_driveAccountEmail && ADMIN_EMAILS.some(e=>e.trim().toLowerCase()===_driveAccountEmail.trim().toLowerCase()));
+async function _updateRoleFromEmail(){
+  if(!_driveAccountEmail){
+    // No email known — synchronous fast path, no hashing needed. Every
+    // existing fail-safe call site relies on this resolving before the
+    // (non-async) code right after it runs; since this branch never hits
+    // an `await`, it still does.
+    _isAdmin = ADMIN_EMAILS.length===0;
+    _applyRoleToUI();
+    return;
+  }
+  _isAdmin = ADMIN_EMAILS.length===0 || ADMIN_EMAILS.includes(await _sha256Hex(_driveAccountEmail));
   _applyRoleToUI();
 }
 
@@ -4562,7 +4608,7 @@ async function _shareGateSignIn(){
     if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
       throw new Error('Could not verify your Google account email, so access was not granted.');
     }
-    _updateRoleFromEmail();
+    await _updateRoleFromEmail();
     _driveConnected=true;
     try{localStorage.setItem(DRIVE_TOKEN_LS_KEY,'1');}catch(_){}
     _shareGateSetStatus('info','Loading quiz…');
@@ -4633,7 +4679,7 @@ async function _shareGateBoot(){
     if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
       throw new Error('Could not verify Google account email on silent reconnect.');
     }
-    _updateRoleFromEmail();
+    await _updateRoleFromEmail();
     _driveConnected=true;
     await _driveFindOrCreateFileAndHydrate();
     _driveRenderModalUI();
@@ -4726,7 +4772,7 @@ function _driveRenderModalUI(){
           without needing a redeploy. This does <strong>not</strong> detect or react to someone
           copying the app's code — see the note above <code>ADMIN_EMAILS</code> in the source for
           why that isn't something client-side code can reliably do.
-          <textarea id="drive-revoke-emails" rows="3" style="width:100%;margin-top:6px;font-family:'DM Mono',monospace;font-size:11.5px;border:1px solid var(--border-light);border-radius:6px;padding:6px 8px;resize:vertical" placeholder="someone@example.com">${_escHtml((_revokedEmails||[]).join('\n'))}</textarea>
+          <textarea id="drive-revoke-emails" rows="3" style="width:100%;margin-top:6px;font-family:'DM Mono',monospace;font-size:11.5px;border:1px solid var(--border-light);border-radius:6px;padding:6px 8px;resize:vertical" placeholder="someone@example.com">${_escHtml(_getRevokedEmailsPlaintextCache().join('\n'))}</textarea>
           <button class="fc-action" style="padding:3px 10px;margin-top:6px" onclick="_driveSaveRevokedEmails()">Save &amp; push to Drive</button>
         </div>` : ''));
   } else {
@@ -4742,11 +4788,23 @@ function _driveRenderModalUI(){
   _driveSetStatus(_driveConnected?'ok':'', '');
 }
 
-function _driveSaveRevokedEmails(){
+function _getRevokedEmailsPlaintextCache(){
+  try{
+    const raw=localStorage.getItem(REVOKED_EMAILS_PLAINTEXT_CACHE_KEY);
+    const arr=raw?JSON.parse(raw):[];
+    return Array.isArray(arr)?arr:[];
+  }catch(_){ return []; }
+}
+async function _driveSaveRevokedEmails(){
   if(!_isAdmin)return;
   const ta=document.getElementById('drive-revoke-emails');
   if(!ta)return;
-  _revokedEmails=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const plaintextList=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  // Cache the plaintext locally (this admin's browser only, never synced) so
+  // the textarea can be repopulated with real emails next time this modal
+  // opens — the synced copy below is hashes, which can't be reversed back.
+  try{ localStorage.setItem(REVOKED_EMAILS_PLAINTEXT_CACHE_KEY, JSON.stringify(plaintextList)); }catch(_){}
+  _revokedEmails = await Promise.all(plaintextList.map(_sha256Hex));
   scheduleDriveSync(true);
   showShortcutToast('Revoked-emails list saved — pushing to Drive ✓');
 }
@@ -4831,7 +4889,7 @@ async function driveConnect(){
       // and stop, rather than connecting Drive under an unknown identity.
       throw new Error('Could not verify your Google account email, so admin access was not granted. Please try connecting again.');
     }
-    _updateRoleFromEmail();
+    await _updateRoleFromEmail();
     _driveConnected=true;
     try{localStorage.setItem(DRIVE_TOKEN_LS_KEY,'1');}catch(_){}
     _driveSetStatus('syncing','Connecting to your library…');
@@ -4906,7 +4964,7 @@ async function driveTryAutoReconnect(){
     if(!_driveAccountEmail && ADMIN_EMAILS.length>0){
       throw new Error('Could not verify Google account email on silent reconnect.');
     }
-    _updateRoleFromEmail();
+    await _updateRoleFromEmail();
     _driveConnected=true;
     await _driveFindOrCreateFileAndHydrate();
     _driveSetStatus('ok','');
@@ -5019,7 +5077,7 @@ async function _driveFindOrCreateFileAndHydrate(){
     _driveFileId=DRIVE_SHARED_FILE_ID;
     const payload=await _driveDownloadFile(DRIVE_SHARED_FILE_ID);
     _revokedEmails=Array.isArray(payload&&payload.revokedEmails)?payload.revokedEmails:_revokedEmails;
-    if(!_isAdmin && _isEmailRevoked(_driveAccountEmail)){
+    if(!_isAdmin && await _isEmailRevoked(_driveAccountEmail)){
       _showAccessRevokedGate();
       return;
     }
