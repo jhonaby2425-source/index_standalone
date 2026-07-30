@@ -3059,6 +3059,18 @@ button,
             <span class="randomize-badge" id="randomize-badge" style="display:none">🔀 Shuffle ON</span>
           </div>
           <div class="randomize-hint" id="randomize-hint" style="display:none">🔀 Questions will appear in a random order each time the quiz is taken in Preview.</div>
+          <div class="randomize-label" style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+            Answer Choices
+          </div>
+          <div class="randomize-row">
+            <label class="randomize-toggle-wrap" onclick="toggleRandomizeOptions()">
+              <div class="toggle-track" id="randomize-options-toggle-track"><div class="toggle-knob"></div></div>
+              <span class="randomize-toggle-label" id="randomize-options-toggle-label">Fixed order</span>
+            </label>
+            <span class="randomize-badge" id="randomize-options-badge" style="display:none">🔀 Shuffle ON</span>
+          </div>
+          <div class="randomize-hint" id="randomize-options-hint" style="display:none">🔀 Answer choices for multiple-choice, checkbox, and dropdown questions will appear in a random order each time the quiz is taken, so the correct answer isn't always in the same position.</div>
         </div>
         <div class="mode-section">
           <div class="mode-label">Quiz Mode — sets default question type</div>
@@ -3507,6 +3519,8 @@ const STATE = {
   // ── Randomize ────────────────────────────────────────────────────────────────
   randomizeEnabled:  false,   // whether questions shuffle in preview
   previewItemsOrder: [],      // cached shuffled order (unused externally, kept for future)
+  randomizeOptionsEnabled: false, // whether answer choices (radio/checkbox/dropdown) shuffle in preview
+  previewOptionsOrder: {},    // cached shuffled option order, keyed by question id — see getShuffledOptions()
   // ── Cached item counters (O(1) alternatives to items.filter() in updateStats) ─
   // Incremented/decremented on every add/delete; recomputed on undo/redo/load.
   questionCount:     0,       // number of items where kind === 'question'
@@ -3682,6 +3696,8 @@ Object.defineProperties(window, {
   attemptsFilter:    { get(){ return STATE.attemptsFilter;    }, set(v){ STATE.attemptsFilter=v;    }, configurable:true },
   randomizeEnabled:  { get(){ return STATE.randomizeEnabled;  }, set(v){ STATE.randomizeEnabled=v;  }, configurable:true },
   previewItemsOrder: { get(){ return STATE.previewItemsOrder; }, set(v){ STATE.previewItemsOrder=v; }, configurable:true },
+  randomizeOptionsEnabled: { get(){ return STATE.randomizeOptionsEnabled; }, set(v){ STATE.randomizeOptionsEnabled=v; }, configurable:true },
+  previewOptionsOrder:     { get(){ return STATE.previewOptionsOrder;     }, set(v){ STATE.previewOptionsOrder=v;     }, configurable:true },
   autoSaveTimer:     { get(){ return STATE.autoSaveTimer;     }, set(v){ STATE.autoSaveTimer=v;     }, configurable:true },
   rescoreTimer:      { get(){ return STATE.rescoreTimer;      }, set(v){ STATE.rescoreTimer=v;      }, configurable:true },
   questionCount:     { get(){ return STATE.questionCount;     }, set(v){ STATE.questionCount=v;     }, configurable:true },
@@ -7333,6 +7349,7 @@ function openForm(id){
     timerWarned2Min:   false,
     timerWarned30Sec:  false,
     previewItemsOrder: [],
+    previewOptionsOrder: {},
   });
   // Kill any draft-autosave that got scheduled (by this reset, or leftover
   // from whatever form/session was open before) before it has a chance to
@@ -7374,7 +7391,7 @@ function openForm(id){
     const rescoreBtn=document.createElement('button');rescoreBtn.className='btn-outline admin-only';rescoreBtn.title='Re-grade every saved attempt for this form against the current answer key';_setSafeInnerHTML(rescoreBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Rescore');rescoreBtn.addEventListener('click',manualRescoreForm);
     tr.append(urWrap,badge,backBtn,saveBtn,prevBtn,printBtn,rescoreBtn);
   })();
-  renderModeGrid();renderThemeGrid();initTimerUI();initRandomizeUI();
+  renderModeGrid();renderThemeGrid();initTimerUI();initRandomizeUI();initRandomizeOptionsUI();
   clearHistory();
   const list=document.getElementById('questions-list');
   _setSafeInnerHTML(list,'<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading questions…</p></div>');
@@ -7431,6 +7448,7 @@ function saveCurrentForm(){
   f.questionCount=STATE.questionCount;  // cached — no O(n) filter needed
   f.timerEnabled=timerEnabled;f.timerTotalSeconds=timerTotalSeconds;
   f.randomizeEnabled=randomizeEnabled;
+  f.randomizeOptionsEnabled=randomizeOptionsEnabled;
   _invalidateSortedForms(); // updatedAt / questionCount changed in-place
 }
 function saveAndGoBack(){
@@ -8378,7 +8396,7 @@ const QUESTION_TYPES = {
       // is masked behind the tap-to-reveal spoiler instead of leaking in
       // plain text. data-optval / the onclick payload stay on the raw,
       // un-spoilerized string since those drive answer matching, not display.
-      return`<div class="p-opts">${(q.options||[]).map(o=>`<div class="p-opt" data-optval="${escHtml(o)}" onclick="pickRadio(${q.id},'${escJs(o)}')"><div class="p-radio${ans===o?' on':''}"><div class="p-radio-dot"></div></div><span class="p-opt-text">${_spoilerize(escHtml(o))}</span></div>`).join('')}</div>`;
+      return`<div class="p-opts">${getShuffledOptions(q).map(o=>`<div class="p-opt" data-optval="${escHtml(o)}" onclick="pickRadio(${q.id},'${escJs(o)}')"><div class="p-radio${ans===o?' on':''}"><div class="p-radio-dot"></div></div><span class="p-opt-text">${_spoilerize(escHtml(o))}</span></div>`).join('')}</div>`;
     },
     score(q,ans){return{correct:!!(q.correct&&ans&&_normTxt(ans)===_normTxt(q.correct))};},
     hasCorrect(q){return!!(q.correct&&q.correct.trim());},
@@ -8414,7 +8432,7 @@ const QUESTION_TYPES = {
       const arr=Array.isArray(ans)?ans:[];
       // See radio.buildPreview above: option display text is spoilerized so
       // bracketed clues are masked; data-optval stays raw for matching.
-      return`<div class="p-opts">${(q.options||[]).map(o=>`<div class="p-opt" data-optval="${escHtml(o)}" onclick="pickCheckbox(${q.id},'${escJs(o)}')"><div class="p-checkbox${arr.includes(o)?' on':''}">✓</div><span class="p-opt-text">${_spoilerize(escHtml(o))}</span></div>`).join('')}</div>`;
+      return`<div class="p-opts">${getShuffledOptions(q).map(o=>`<div class="p-opt" data-optval="${escHtml(o)}" onclick="pickCheckbox(${q.id},'${escJs(o)}')"><div class="p-checkbox${arr.includes(o)?' on':''}">✓</div><span class="p-opt-text">${_spoilerize(escHtml(o))}</span></div>`).join('')}</div>`;
     },
     score(q,ans){
       if(!q.correct)return{correct:false};
@@ -8440,7 +8458,7 @@ const QUESTION_TYPES = {
       // tap-to-reveal <span class="p-spoiler"> markup used elsewhere can't be
       // nested here. Authors should avoid [bracketed] clues in dropdown
       // options; use radio/checkbox for choices that need a masked hint.
-      return`<select class="p-select" id="pinp-${q.id}" onchange="setDropdownAnswer(${q.id},this.value)"><option value="">Choose</option>${(q.options||[]).map(o=>`<option value="${escHtml(o)}" ${ans===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>`;
+      return`<select class="p-select" id="pinp-${q.id}" onchange="setDropdownAnswer(${q.id},this.value)"><option value="">Choose</option>${getShuffledOptions(q).map(o=>`<option value="${escHtml(o)}" ${ans===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>`;
     },
     score(q,ans){return{correct:!!(q.correct&&ans&&_normTxt(ans)===_normTxt(q.correct))};},
     hasCorrect(q){return!!(q.correct&&q.correct.trim());},
@@ -9000,6 +9018,8 @@ function _savePreviewDraft(){
     timerWarned30Sec,
     randomizeEnabled,
     previewItemsOrder: randomizeEnabled ? previewItemsOrder : [],
+    randomizeOptionsEnabled,
+    previewOptionsOrder: randomizeOptionsEnabled ? previewOptionsOrder : {},
     savedAt: Date.now(),
   };
   return dbPutOne(STORE_DRAFTS, draft);
@@ -9099,6 +9119,11 @@ async function _enterPreviewTab(){
         // (see getPreviewItems) instead of letting a fresh shuffle scramble
         // page/section positions out from under their saved currentPage.
         previewItemsOrder: (draft.randomizeEnabled && Array.isArray(draft.previewItemsOrder)) ? draft.previewItemsOrder : [],
+        // Same reasoning as previewItemsOrder above, but for per-question
+        // answer-choice order: reuse exactly what the student saw before, so
+        // resuming doesn't silently re-shuffle choices they already reasoned
+        // about (and doesn't disagree with an option they already picked).
+        previewOptionsOrder: (draft.randomizeOptionsEnabled && draft.previewOptionsOrder && typeof draft.previewOptionsOrder==='object') ? draft.previewOptionsOrder : {},
       });
       buildPreviewPages();
       // Start the timer BEFORE rendering: renderPreview() decides which timer
@@ -9124,7 +9149,7 @@ async function _enterPreviewTab(){
     }
     _clearPreviewDraft(currentFormId);
   }
-  setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[]});
+  setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[],previewOptionsOrder:{}});
   stopPreviewTimer();setState({previewTimerRemaining:0});
   buildPreviewPages();
   // Auto-start the countdown the moment the quiz is opened — no more manual
@@ -9332,7 +9357,7 @@ function renderPreview(){
   const pct=totalQ>0?Math.round(answeredQ/totalQ*100):0;
   const pageQ=getQuestionsOnPage(currentPage);
 
-  let html=`<div class="preview-hdr"><div class="preview-stripe" style="background:${fc}"></div><div class="preview-hdr-body"><div class="preview-title">${escHtml(title)}</div>${desc?`<div class="preview-desc">${escHtml(desc)}</div>`:''}<div class="preview-mode-badge" style="color:${fc};background:${fc}18">${mode?mode.icon+' '+mode.label:'Quiz'} Mode</div>${randomizeEnabled?`<div class="preview-mode-badge" style="color:#5c35b1;background:#ede7f6;margin-left:6px">🔀 Randomized</div>`:''}<div class="preview-required-note">* Required</div></div></div>`;
+  let html=`<div class="preview-hdr"><div class="preview-stripe" style="background:${fc}"></div><div class="preview-hdr-body"><div class="preview-title">${escHtml(title)}</div>${desc?`<div class="preview-desc">${escHtml(desc)}</div>`:''}<div class="preview-mode-badge" style="color:${fc};background:${fc}18">${mode?mode.icon+' '+mode.label:'Quiz'} Mode</div>${randomizeEnabled?`<div class="preview-mode-badge" style="color:#5c35b1;background:#ede7f6;margin-left:6px">🔀 Randomized</div>`:''}${randomizeOptionsEnabled?`<div class="preview-mode-badge" style="color:#5c35b1;background:#ede7f6;margin-left:6px">🔀 Answers Shuffled</div>`:''}<div class="preview-required-note">* Required</div></div></div>`;
 
   if(!items.length){html+=`<div class="empty-state"><p>No questions yet. Go to Questions tab to add some.</p></div>`;wrap.innerHTML=html;return;}
 
@@ -9759,7 +9784,7 @@ function hasCorrectDefined(q){
   return handler?handler.hasCorrect(q):false;
 }
 function clearPreview(){setState({previewAnswers:{},previewValidation:false});_clearPreviewDraft(currentFormId);renderPreview();}
-function resetPreview(){setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[]});stopPreviewTimer();setState({previewTimerRemaining:0});_clearPreviewDraft(currentFormId);buildPreviewPages();if(timerEnabled&&timerTotalSeconds>0)startPreviewTimer();renderPreview();}
+function resetPreview(){setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[],previewOptionsOrder:{}});stopPreviewTimer();setState({previewTimerRemaining:0});_clearPreviewDraft(currentFormId);buildPreviewPages();if(timerEnabled&&timerTotalSeconds>0)startPreviewTimer();renderPreview();}
 
 // §SHARE_RESULTS ──────────────────────────────────────────────────────────────
 // Generates a styled, printable results summary card that opens in a new window.
@@ -10173,6 +10198,14 @@ function toggleRandomize(){setState({randomizeEnabled:!randomizeEnabled});const 
 
 function initRandomizeUI(){const f=forms.find(x=>x.id===currentFormId);if(!f)return;setState({randomizeEnabled:!!f.randomizeEnabled});const t=document.getElementById('randomize-toggle-track');const l=document.getElementById('randomize-toggle-label');const h=document.getElementById('randomize-hint');const b=document.getElementById('randomize-badge');if(t)t.classList.toggle('on',randomizeEnabled);if(l)l.textContent=randomizeEnabled?'Questions randomized':'Fixed order';if(h)h.style.display=randomizeEnabled?'block':'none';if(b)b.style.display=randomizeEnabled?'inline-flex':'none';}
 
+// Independent toggle for shuffling answer-choice order (radio/checkbox/dropdown
+// options) in Preview — separate from question-order randomize above, since an
+// author may want one without the other. See getShuffledOptions() for how the
+// shuffled order is generated and cached per question/attempt.
+function toggleRandomizeOptions(){setState({randomizeOptionsEnabled:!randomizeOptionsEnabled,previewOptionsOrder:{}});const t=document.getElementById('randomize-options-toggle-track');const l=document.getElementById('randomize-options-toggle-label');const h=document.getElementById('randomize-options-hint');const b=document.getElementById('randomize-options-badge');if(t)t.classList.toggle('on',randomizeOptionsEnabled);if(l)l.textContent=randomizeOptionsEnabled?'Answer choices randomized':'Fixed order';if(h)h.style.display=randomizeOptionsEnabled?'block':'none';if(b)b.style.display=randomizeOptionsEnabled?'inline-flex':'none';saveCurrentForm();if(currentFormId)persistFormById(currentFormId);}
+
+function initRandomizeOptionsUI(){const f=forms.find(x=>x.id===currentFormId);if(!f)return;setState({randomizeOptionsEnabled:!!f.randomizeOptionsEnabled});const t=document.getElementById('randomize-options-toggle-track');const l=document.getElementById('randomize-options-toggle-label');const h=document.getElementById('randomize-options-hint');const b=document.getElementById('randomize-options-badge');if(t)t.classList.toggle('on',randomizeOptionsEnabled);if(l)l.textContent=randomizeOptionsEnabled?'Answer choices randomized':'Fixed order';if(h)h.style.display=randomizeOptionsEnabled?'block':'none';if(b)b.style.display=randomizeOptionsEnabled?'inline-flex':'none';}
+
 function shuffleArray(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
 function getPreviewItems(){
@@ -10215,6 +10248,39 @@ function getPreviewItems(){
     shuffled=result;
   }
   setState({previewItemsOrder: shuffled.map(it=>it.id)});
+  return shuffled;
+}
+
+/**
+ * Returns the option list to render for a radio/checkbox/dropdown question in
+ * Preview, shuffled per-question when the "Answer Choices" randomize toggle
+ * is on. Without this, QUESTION_TYPES.*.buildPreview() renders q.options in
+ * the exact order they were authored in — so if an author habitually types
+ * the correct choice first (or in any other recurring position), that
+ * position repeats on every attempt, letting students answer by pattern
+ * instead of content (e.g. "the answer is always A").
+ *
+ * Mirrors getPreviewItems()'s caching strategy: the shuffled order is
+ * generated once per question per attempt and cached in previewOptionsOrder
+ * (keyed by question id) rather than recomputed on every call — otherwise
+ * every renderPreview() re-render (which fires on nearly every answer click)
+ * would re-shuffle the options out from under the student, making their
+ * just-selected choice appear to jump to a different position on screen.
+ */
+function getShuffledOptions(q){
+  const opts=q.options||[];
+  if(!randomizeOptionsEnabled||opts.length<2)return opts;
+  const cached=previewOptionsOrder[q.id];
+  // Only reuse the cached order if it's still a valid permutation of this
+  // question's current options — if the teacher added/removed/edited an
+  // option since the order was generated, fall through and reshuffle rather
+  // than silently rendering stale or missing choices.
+  if(Array.isArray(cached)&&cached.length===opts.length){
+    const sortedCached=[...cached].sort(),sortedOpts=[...opts].sort();
+    if(sortedCached.every((v,i)=>v===sortedOpts[i]))return cached;
+  }
+  const shuffled=shuffleArray(opts);
+  setState({previewOptionsOrder:{...previewOptionsOrder,[q.id]:shuffled}});
   return shuffled;
 }
 
@@ -11417,6 +11483,36 @@ document.addEventListener('touchstart',e=>{
   assert('long: hasCorrect false',QUESTION_TYPES.long.hasCorrect({correct:''}),false);
   assert('date: never correct',QUESTION_TYPES.date.score({},'2025-01-01').correct,false);
   assert('date: hasCorrect false',QUESTION_TYPES.date.hasCorrect({}),false);
+
+  // ── getShuffledOptions() — answer-choice randomize ────────────────────────
+  // Save/restore real STATE so this suite can't leak toggled flags or cached
+  // orders into the actual app session it's running inside of.
+  (function testGetShuffledOptions(){
+    const savedEnabled=STATE.randomizeOptionsEnabled, savedCache=STATE.previewOptionsOrder;
+    try{
+      const q={id:'__test_q__',options:['A','B','C','D']};
+
+      STATE.randomizeOptionsEnabled=false; STATE.previewOptionsOrder={};
+      assert('getShuffledOptions: off returns original order',getShuffledOptions(q).join(','),'A,B,C,D');
+
+      STATE.randomizeOptionsEnabled=true; STATE.previewOptionsOrder={};
+      const first=getShuffledOptions(q);
+      assert('getShuffledOptions: on returns same option set',[...first].sort().join(','),'A,B,C,D');
+      const second=getShuffledOptions(q);
+      assert('getShuffledOptions: result cached across calls (stable per attempt)',second.join(','),first.join(','));
+
+      // Editing the question's options (teacher changes an option after the
+      // order was cached) must invalidate the stale cached permutation.
+      const q2={id:'__test_q__',options:['A','B','X','D']};
+      const third=getShuffledOptions(q2);
+      assert('getShuffledOptions: stale cache invalidated on option edit',[...third].sort().join(','),'A,B,D,X');
+
+      assert('getShuffledOptions: single option returned as-is',getShuffledOptions({id:'__t2__',options:['Only']}).join(','),'Only');
+      assert('getShuffledOptions: missing options returns empty array',getShuffledOptions({id:'__t3__'}).length,0);
+    } finally {
+      STATE.randomizeOptionsEnabled=savedEnabled; STATE.previewOptionsOrder=savedCache;
+    }
+  })();
 
   const total=passed+failed;
   if(failed===0){
