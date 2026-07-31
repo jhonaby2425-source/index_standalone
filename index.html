@@ -661,6 +661,33 @@ body.role-viewer #integrity-banner{display:flex}
 .review-status{font-size:14px;font-weight:700;flex-shrink:0}
 .review-ans,.review-correct{font-size:12px;color:var(--text2);margin-top:2px;padding-left:29px}
 .review-ans-label{color:var(--text3);font-weight:500}
+.review-card:focus-visible,.review-card:focus{outline:2px solid var(--purple);outline-offset:2px}
+@keyframes reviewCardFlash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--purple-mid)}}
+.review-card-flash{animation:reviewCardFlash 1.6s ease}
+.missed-summary{width:100%;margin:16px 0 4px;text-align:left}
+.missed-summary-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.missed-summary-title{font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.8px}
+.missed-summary-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;padding:2px 2px 2px 0}
+.missed-summary-item{display:flex;align-items:flex-start;gap:9px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:8px;padding:9px 10px}
+.missed-summary-item-num{flex-shrink:0;font-weight:700;color:var(--red);font-size:11px;min-width:20px;margin-top:1px}
+.missed-summary-item-body{flex:1;min-width:0}
+.missed-summary-item-label{font-weight:500;color:var(--text);font-size:12.5px;line-height:1.4;margin-bottom:3px;overflow-wrap:anywhere}
+.missed-summary-item-ans{display:block;color:var(--text2);font-size:11.5px;line-height:1.5}
+.missed-summary-item-ans strong{color:var(--red);font-weight:600}
+.missed-summary-item-correct{color:var(--green);font-weight:600}
+.missed-summary-jump-btn{flex-shrink:0;align-self:center;background:var(--surface);border:1.5px solid var(--red-border);color:var(--red);font-size:11px;font-weight:600;border-radius:6px;padding:6px 9px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.missed-summary-jump-btn:hover{background:var(--red);color:#fff}
+.missed-summary-jump-btn:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+.missed-summary-empty{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green);border-radius:8px;padding:11px 14px;font-size:12.5px;font-weight:600;text-align:center}
+.review-filter-bar{display:flex;gap:6px;margin:2px 0 12px;flex-wrap:wrap;width:100%}
+.review-filter-btn{background:var(--surface2);border:1.5px solid var(--border);color:var(--text2);font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s}
+.review-filter-btn:hover:not(:disabled){background:var(--purple-dim)}
+.review-filter-btn.active{background:var(--purple);border-color:var(--purple);color:#fff}
+.review-filter-btn:disabled{opacity:.45;cursor:default}
+.review-filter-btn:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+#review-cards-container[data-filter="incorrect"] .review-card:not([data-status="incorrect"]){display:none}
+#review-cards-container[data-filter="correct"] .review-card:not([data-status="correct"]){display:none}
+@media(max-width:480px){.missed-summary-item{flex-wrap:wrap}.missed-summary-jump-btn{margin-left:29px}}
 .opt-correct-toggle{cursor:pointer;transition:all .15s;position:relative}
 .opt-correct-toggle:hover{border-color:var(--green)!important;background:var(--green-bg)!important}
 .opt-correct-toggle.opt-correct{background:var(--green)!important;border-color:var(--green)!important}
@@ -9149,6 +9176,7 @@ async function _enterPreviewTab(){
     }
     _clearPreviewDraft(currentFormId);
   }
+  if(_reviewBatchState){if(_reviewBatchState.io)_reviewBatchState.io.disconnect();_reviewBatchState=null;}
   setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[],previewOptionsOrder:{}});
   stopPreviewTimer();setState({previewTimerRemaining:0});
   buildPreviewPages();
@@ -9232,6 +9260,9 @@ function renderPreview(){
     const sc=previewScore||{earned:0,total:0,results:[],pct:null};
     const hasScorable=sc.results.some(r=>r.hasCorrect);
     const faN=getFormAttemptCount(currentFormId);
+    const correctN=sc.results.filter(r=>r.hasCorrect&&r.correct).length;
+    const wrongN=sc.results.filter(r=>r.hasCorrect&&!r.correct).length;
+    const ungradedN=sc.results.filter(r=>!r.hasCorrect).length;
     let scoreHtml='';
     if(hasScorable){
       const pct=sc.pct!=null?sc.pct:0;
@@ -9239,9 +9270,6 @@ function renderPreview(){
       const gc=pct>=70?'var(--green)':pct>=50?'#f57f17':'var(--red)';
       const passLabel=pct>=70?'PASS':'FAIL';
       const passClass=pct>=70?'score-pass-badge score-pass-badge--pass':'score-pass-badge score-pass-badge--fail';
-      const correctN=sc.results.filter(r=>r.hasCorrect&&r.correct).length;
-      const wrongN=sc.results.filter(r=>r.hasCorrect&&!r.correct).length;
-      const ungradedN=sc.results.filter(r=>!r.hasCorrect).length;
       scoreHtml=`<div class="score-wrap" role="region" aria-label="Score: ${pct}% — Grade ${grade} — ${passLabel}. ${correctN} correct, ${wrongN} wrong${ungradedN?', '+ungradedN+' ungraded':''}.">
         <div class="score-circle" style="border-color:${gc}" aria-hidden="true">
           <div class="score-pct" style="color:${gc}">${pct}%</div>
@@ -9264,62 +9292,91 @@ function renderPreview(){
     successCard.append(checkDiv,msgDiv,subDiv,numDiv);
     // scoreHtml interpolates only numbers, CSS-var strings, and grade letters — no user data.
     if(scoreHtml){const scoreFrag=document.createElement('div');_setSafeInnerHTML(scoreFrag,scoreHtml);successCard.appendChild(scoreFrag);}
+
+    // §MISSED_SUMMARY — a compact, self-contained "what did I get wrong"
+    // panel shown immediately under the score, before the full Answer
+    // Review list. Built from sc.results directly (not from DOM), so it
+    // never depends on which review cards happen to be lazy-rendered yet.
+    // Each row's "Review ↓" button jumps into the full list below via
+    // jumpToReviewCard(), forcing any not-yet-rendered batch to render on
+    // demand (see _reviewEnsureRendered()).
+    if(hasScorable){
+      const missedIdx=[];
+      sc.results.forEach((r,i)=>{if(r.hasCorrect&&!r.correct)missedIdx.push(i);});
+      const missedWrap=document.createElement('div');
+      missedWrap.className='missed-summary';
+      missedWrap.setAttribute('role','region');
+      missedWrap.setAttribute('aria-label',missedIdx.length?`${missedIdx.length} missed question${missedIdx.length===1?'':'s'}`:'All scored questions answered correctly');
+      if(missedIdx.length){
+        const hdr=document.createElement('div');hdr.className='missed-summary-hdr';
+        const t=document.createElement('div');t.className='missed-summary-title';t.textContent=`Missed Questions (${missedIdx.length})`;
+        hdr.appendChild(t);
+        missedWrap.appendChild(hdr);
+        const list=document.createElement('div');list.className='missed-summary-list';list.setAttribute('role','list');
+        missedIdx.forEach(i=>{
+          const r=sc.results[i];const{q}=r;
+          const handler=QUESTION_TYPES[q.type];
+          const ans=previewAnswers[q.id];
+          const ad=handler?handler.formatAnswer(q,ans):(ans||'(not answered)');
+          const cd=handler?handler.formatCorrect(q):(q.correct||'');
+          const item=document.createElement('div');item.className='missed-summary-item';item.setAttribute('role','listitem');
+          const num=document.createElement('span');num.className='missed-summary-item-num';num.textContent='Q'+(i+1);
+          const body=document.createElement('div');body.className='missed-summary-item-body';
+          const labelDiv=document.createElement('div');labelDiv.className='missed-summary-item-label';labelDiv.innerHTML=_reviewLabelHtml(q);
+          const ansDiv=document.createElement('div');ansDiv.className='missed-summary-item-ans';
+          ansDiv.innerHTML='Your answer: <strong>'+_escHtml(String(ad)||'(not answered)')+'</strong>';
+          body.append(labelDiv,ansDiv);
+          if(cd){
+            const corrDiv=document.createElement('div');corrDiv.className='missed-summary-item-ans missed-summary-item-correct';
+            corrDiv.textContent='Correct answer: '+cd;
+            body.appendChild(corrDiv);
+          }
+          const jumpBtn=document.createElement('button');jumpBtn.type='button';jumpBtn.className='missed-summary-jump-btn';
+          jumpBtn.textContent='↓ Review';
+          jumpBtn.setAttribute('aria-label','Jump to question '+(i+1)+' in Answer Review below');
+          jumpBtn.addEventListener('click',()=>jumpToReviewCard(i));
+          item.append(num,body,jumpBtn);
+          list.appendChild(item);
+        });
+        missedWrap.appendChild(list);
+      } else {
+        const okDiv=document.createElement('div');okDiv.className='missed-summary-empty';
+        okDiv.textContent='🎉 No incorrect answers on scored questions — nice work!';
+        missedWrap.appendChild(okDiv);
+      }
+      successCard.appendChild(missedWrap);
+    }
+
     if(sc.results.length){
       const reviewTitle=document.createElement('div');reviewTitle.className='review-section-title';reviewTitle.textContent='Answer Review';
       successCard.appendChild(reviewTitle);
-      const REVIEW_BATCH=20;
-      const tpl=document.getElementById('tpl-review-card');
-      const reviewContainer=document.createElement('div');reviewContainer.id='review-cards-container';
-      function buildReviewCard(r,idx){
-        const{q,correct,hasCorrect}=r;
-        const ans=previewAnswers[q.id];
-        const handler=QUESTION_TYPES[q.type];
-        const ad=handler?handler.formatAnswer(q,ans):(ans||(hasCorrect?'—':'(not answered)'));
-        const cd=handler?handler.formatCorrect(q):(q.correct||'');
-        const si=!hasCorrect?'—':correct?'✓':'✗';
-        const sc2=!hasCorrect?'var(--text3)':correct?'var(--green)':'var(--red)';
-        const cb=!hasCorrect?'var(--border)':correct?'var(--green-border)':'var(--red-border)';
-        const cbg=!hasCorrect?'var(--surface)':correct?'var(--green-bg)':'var(--red-bg)';
-        const card=tpl.content.cloneNode(true).querySelector('.review-card');
-        card.style.borderColor=cb;card.style.background=cbg;
-        card.querySelector('.review-q-num').textContent='Q'+(idx+1);
-        card.querySelector('.review-q-label').innerHTML=_reviewLabelHtml(q);
-        const statusEl=card.querySelector('.review-status');statusEl.style.color=sc2;statusEl.textContent=si;
-        if(r.pts){const ptsNote=document.createElement('span');ptsNote.className='js-pts-note';ptsNote.textContent=' ('+r.earned+'/'+r.pts+'pts)';statusEl.appendChild(ptsNote);}
-        card.querySelector('.review-ans-val').textContent=String(ad);
-        const corrDiv=card.querySelector('.review-correct');
-        if(hasCorrect&&!correct){card.querySelector('.review-correct-val').textContent=cd;corrDiv.style.display='';}
-        return card;
+
+      // Only show filter controls when there's more than one status present —
+      // filtering a single-status list adds noise without adding value.
+      if(hasScorable&&(correctN>0)+(wrongN>0)+(ungradedN>0)>1){
+        const filterBar=document.createElement('div');filterBar.className='review-filter-bar';
+        filterBar.setAttribute('role','group');filterBar.setAttribute('aria-label','Filter Answer Review list');
+        [['all','All',sc.results.length],['incorrect','Incorrect',wrongN],['correct','Correct',correctN]].forEach(([key,label,n])=>{
+          const b=document.createElement('button');b.type='button';
+          b.className='review-filter-btn'+(key==='all'?' active':'');
+          b.textContent=`${label} (${n})`;
+          b.dataset.filterBtn=key;
+          b.setAttribute('aria-pressed',key==='all'?'true':'false');
+          if(n===0){b.disabled=true;}
+          b.addEventListener('click',()=>setReviewFilter(key));
+          filterBar.appendChild(b);
+        });
+        successCard.appendChild(filterBar);
       }
-      const firstBatch=sc.results.slice(0,REVIEW_BATCH);
-      const firstFrag=document.createDocumentFragment();
-      firstBatch.forEach((r,i)=>firstFrag.appendChild(buildReviewCard(r,i)));
-      reviewContainer.appendChild(firstFrag);
-      const remaining=sc.results.slice(REVIEW_BATCH);
-      if(remaining.length){
-        function scheduleRemainingCards(items,startIdx,container){
-          if(!items.length)return;
-          const sentinel=document.createElement('div');sentinel.className='js-lazy-sentinel';container.appendChild(sentinel);
-          const io=new IntersectionObserver(entries=>{
-            if(!entries[0].isIntersecting)return;
-            io.disconnect();sentinel.remove();
-            function renderBatch(batch,bStartIdx,remaining2,startIdx2){
-              requestAnimationFrame(()=>{
-                const frag=document.createDocumentFragment();
-                batch.forEach((r,i)=>frag.appendChild(buildReviewCard(r,bStartIdx+i)));
-                container.appendChild(frag);
-                if(remaining2.length)scheduleRemainingCards(remaining2,startIdx2,container);
-              });
-            }
-            const nextBatch=items.slice(0,REVIEW_BATCH);
-            const rest=items.slice(REVIEW_BATCH);
-            renderBatch(nextBatch,startIdx,rest,startIdx+REVIEW_BATCH);
-          },{rootMargin:'200px'});
-          io.observe(sentinel);
-        }
-        scheduleRemainingCards(remaining,REVIEW_BATCH,reviewContainer);
-      }
+
+      const reviewContainer=document.createElement('div');
+      reviewContainer.id='review-cards-container';
+      reviewContainer.setAttribute('role','list');
+      reviewContainer.dataset.filter='all';
       successCard.appendChild(reviewContainer);
+      _initReviewBatch(sc.results,reviewContainer);
+    } else {
+      _reviewBatchState=null;
     }
     const againBtn=document.createElement('button');againBtn.className='success-again';againBtn.textContent='Submit Another Response';againBtn.addEventListener('click',resetPreview);
     // Admins get the normal "View all my attempts" link into the Attempt
@@ -9783,8 +9840,123 @@ function hasCorrectDefined(q){
   const handler=QUESTION_TYPES[q.type];
   return handler?handler.hasCorrect(q):false;
 }
+
+// §REVIEW_CARDS — module-level builder + progressive (lazy) batch renderer
+// for the "Answer Review" list on the post-submit preview screen. Lifted out
+// of renderPreview() (where it used to live as closures rebuilt on every
+// render) so that jumpToReviewCard() and setReviewFilter() — triggered by
+// user clicks well after the initial render — can reach into the same
+// batching state to force still-unrendered cards to render on demand.
+// _reviewBatchState is reset on every renderPreview() call (see
+// _initReviewBatch / the previewSubmitted branch above) and is intentionally
+// module-scoped rather than attached to STATE: it's pure rendering
+// bookkeeping (DOM refs, an IntersectionObserver, a cursor position), not
+// application state that should survive re-renders or ever be persisted.
+let _reviewBatchState=null;
+const REVIEW_BATCH_SIZE=20;
+
+function _buildReviewCard(r,idx){
+  const{q,correct,hasCorrect}=r;
+  const ans=previewAnswers[q.id];
+  const handler=QUESTION_TYPES[q.type];
+  const ad=handler?handler.formatAnswer(q,ans):(ans||(hasCorrect?'—':'(not answered)'));
+  const cd=handler?handler.formatCorrect(q):(q.correct||'');
+  const si=!hasCorrect?'—':correct?'✓':'✗';
+  const sc2=!hasCorrect?'var(--text3)':correct?'var(--green)':'var(--red)';
+  const cb=!hasCorrect?'var(--border)':correct?'var(--green-border)':'var(--red-border)';
+  const cbg=!hasCorrect?'var(--surface)':correct?'var(--green-bg)':'var(--red-bg)';
+  const status=!hasCorrect?'ungraded':correct?'correct':'incorrect';
+  const tpl=document.getElementById('tpl-review-card');
+  const card=tpl.content.cloneNode(true).querySelector('.review-card');
+  card.id='review-card-'+idx;
+  card.tabIndex=-1; // programmatically focusable (for jumpToReviewCard), not tab-stoppable
+  card.dataset.status=status;
+  card.style.borderColor=cb;card.style.background=cbg;
+  card.querySelector('.review-q-num').textContent='Q'+(idx+1);
+  card.querySelector('.review-q-label').innerHTML=_reviewLabelHtml(q);
+  const statusEl=card.querySelector('.review-status');statusEl.style.color=sc2;statusEl.textContent=si;
+  if(r.pts){const ptsNote=document.createElement('span');ptsNote.className='js-pts-note';ptsNote.textContent=' ('+r.earned+'/'+r.pts+'pts)';statusEl.appendChild(ptsNote);}
+  card.querySelector('.review-ans-val').textContent=String(ad);
+  const corrDiv=card.querySelector('.review-correct');
+  if(hasCorrect&&!correct){card.querySelector('.review-correct-val').textContent=cd;corrDiv.style.display='';}
+  return card;
+}
+
+function _initReviewBatch(results,container){
+  if(_reviewBatchState&&_reviewBatchState.io)_reviewBatchState.io.disconnect();
+  _reviewBatchState={results,container,renderedCount:0,io:null};
+  _reviewRenderNextBatch();
+}
+
+function _reviewRenderNextBatch(){
+  const st=_reviewBatchState;
+  if(!st||st.renderedCount>=st.results.length)return;
+  const batch=st.results.slice(st.renderedCount,st.renderedCount+REVIEW_BATCH_SIZE);
+  const startIdx=st.renderedCount;
+  const oldSentinel=st.container.querySelector('.js-lazy-sentinel');
+  if(oldSentinel)oldSentinel.remove();
+  const frag=document.createDocumentFragment();
+  batch.forEach((r,i)=>frag.appendChild(_buildReviewCard(r,startIdx+i)));
+  st.container.appendChild(frag);
+  st.renderedCount=startIdx+batch.length;
+  if(st.renderedCount<st.results.length){
+    const sentinel=document.createElement('div');sentinel.className='js-lazy-sentinel';st.container.appendChild(sentinel);
+    const io=new IntersectionObserver(entries=>{
+      if(!entries[0].isIntersecting)return;
+      io.disconnect();
+      requestAnimationFrame(_reviewRenderNextBatch);
+    },{rootMargin:'200px'});
+    io.observe(sentinel);
+    st.io=io;
+  } else {
+    st.io=null;
+  }
+}
+
+// Force-renders every batch up to and including `idx`, bypassing the
+// IntersectionObserver wait. Used by jumpToReviewCard() (a user asked to
+// jump to a specific question) and setReviewFilter() (a non-"all" filter
+// must not silently hide questions that just haven't scrolled into view
+// yet). Returns whether that card now exists in the DOM.
+function _reviewEnsureRendered(idx){
+  const st=_reviewBatchState;
+  if(!st)return false;
+  let guard=0; // results.length/REVIEW_BATCH_SIZE batches, plus one — belt-and-braces against an infinite loop if state is ever corrupted
+  while(st.renderedCount<=idx&&st.renderedCount<st.results.length&&guard++<10000){
+    if(st.io){st.io.disconnect();st.io=null;}
+    _reviewRenderNextBatch();
+  }
+  return idx<st.renderedCount;
+}
+
+function jumpToReviewCard(idx){
+  if(!_reviewEnsureRendered(idx))return;
+  const el=document.getElementById('review-card-'+idx);
+  if(!el)return;
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  el.classList.remove('review-card-flash');
+  void el.offsetWidth; // restart the flash animation if it's already mid-run from a prior jump
+  el.classList.add('review-card-flash');
+  el.focus({preventScroll:true});
+  setTimeout(()=>el.classList.remove('review-card-flash'),1600);
+}
+
+function setReviewFilter(filter){
+  const container=document.getElementById('review-cards-container');
+  if(!container)return;
+  container.dataset.filter=filter;
+  document.querySelectorAll('.review-filter-btn').forEach(b=>{
+    const isActive=b.dataset.filterBtn===filter;
+    b.classList.toggle('active',isActive);
+    b.setAttribute('aria-pressed',isActive?'true':'false');
+  });
+  // A non-"all" filter must reflect every matching question, not just the
+  // ones lazy-loaded so far — force the rest of the batches to render.
+  if(filter!=='all'&&_reviewBatchState)_reviewEnsureRendered(_reviewBatchState.results.length-1);
+}
+
 function clearPreview(){setState({previewAnswers:{},previewValidation:false});_clearPreviewDraft(currentFormId);renderPreview();}
-function resetPreview(){setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[],previewOptionsOrder:{}});stopPreviewTimer();setState({previewTimerRemaining:0});_clearPreviewDraft(currentFormId);buildPreviewPages();if(timerEnabled&&timerTotalSeconds>0)startPreviewTimer();renderPreview();}
+function resetPreview(){if(_reviewBatchState){if(_reviewBatchState.io)_reviewBatchState.io.disconnect();_reviewBatchState=null;}setState({previewAnswers:{},previewValidation:false,previewSubmitted:false,previewScore:null,currentPage:0,timerPromptShown:true,timerWarned2Min:false,timerWarned30Sec:false,previewItemsOrder:[],previewOptionsOrder:{}});stopPreviewTimer();setState({previewTimerRemaining:0});_clearPreviewDraft(currentFormId);buildPreviewPages();if(timerEnabled&&timerTotalSeconds>0)startPreviewTimer();renderPreview();}
 
 // §SHARE_RESULTS ──────────────────────────────────────────────────────────────
 // Generates a styled, printable results summary card that opens in a new window.
