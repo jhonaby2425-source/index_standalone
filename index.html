@@ -79,9 +79,10 @@ body.role-viewer .role-viewer-only{display:block}
 /* §DRIVE-PILL — persistent Drive sync/status indicator that lives in the
    app-shell topbar (.topbar never unmounts between views), so it stays
    visible on the dashboard, inside folders, in the form builder, and while
-   taking/previewing a quiz — unlike #dash-drive-btn, which only exists on
-   the dashboard screen. Both stay in sync: _driveSetStatus() updates them
-   together. See _driveSetStatus() / _driveUpdateLastSyncedLabel(). */
+   taking/previewing a quiz. It's now the sole Drive status indicator — the
+   dashboard used to have its own duplicate (#dash-drive-btn), which was
+   removed as part of the header-button dedup (see §dash-header-actions
+   removal). See _driveSetStatus() / _driveUpdateLastSyncedLabel(). */
 .topbar-drive-pill{display:flex;align-items:center;gap:6px;margin-left:6px;padding:4px 10px;border-radius:20px;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#fff;font-size:11px;font-weight:600;letter-spacing:.15px;white-space:nowrap;cursor:pointer;flex-shrink:0;line-height:1.25;font-family:inherit;transition:background .15s ease,border-color .15s ease}
 .topbar-drive-pill:hover{background:rgba(255,255,255,.2)}
 .topbar-drive-pill:focus-visible{outline:2px solid #fff;outline-offset:2px}
@@ -755,7 +756,17 @@ body.role-viewer #integrity-banner{display:flex}
 .bp-btn:disabled{opacity:.35;cursor:not-allowed;}
 .bp-info{font-size:12px;color:var(--text3);white-space:nowrap;}
 .virt-placeholder{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;opacity:.35;pointer-events:none;transition:opacity .15s;}
-.hamburger-btn{display:none;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.35);border-radius:7px;color:#fff;cursor:pointer;padding:7px 9px;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.hamburger-btn{display:flex;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.35);border-radius:7px;color:#fff;cursor:pointer;padding:7px 9px;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+/* Desktop: the hamburger doubles as the dashboard's overflow menu (Groups,
+   Export/Import — see updateMobileMenu()). It's only meaningful on the
+   dashboard, so on wide screens it's hidden while a form is open in the
+   builder/preview (body.in-builder, toggled by openForm()/saveAndGoBack()).
+   Below 600px it stays visible in all views regardless — see the
+   max-width:600px rule further down — since it's the only way to reach
+   several actions on mobile. */
+@media(min-width:601px){
+  body.in-builder .hamburger-btn{display:none}
+}
 .hamburger-btn:hover{background:rgba(255,255,255,.28);border-color:rgba(255,255,255,.6)}
 .hamburger-btn.menu-open{background:rgba(255,255,255,.28)}
 .hamburger-btn svg{width:18px;height:18px;display:block}
@@ -783,7 +794,6 @@ body.role-viewer #integrity-banner{display:flex}
   .topbar-title{max-width:140px}
   #dashboard-inner{padding:16px 12px 60px!important}
   .dash-header{flex-direction:column;align-items:flex-start;gap:10px}
-  .dash-header>div:last-child{width:100%;justify-content:flex-start}
   .forms-grid{grid-template-columns:1fr}
   .sort-bar{gap:5px}
   .sort-btn{font-size:10px;padding:4px 9px}
@@ -1918,56 +1928,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   margin-top: 3px;
 }
 
-/* Dashboard header right-side action button group */
-.dash-header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* btn-attempts colour variants */
-.btn-attempts--attempts {
-  background: var(--purple-dim);
-  color: var(--purple);
-  border-color: var(--border);
-}
-.btn-attempts--groups {
-  background: #f3e8ff;
-  color: #5c35b1;
-  border-color: #d4b8f7;
-  font-weight: 600;
-}
-.btn-attempts--export {
-  background: #fff3e0;
-  color: #e65100;
-  border-color: #ffcc80;
-  font-weight: 600;
-}
-.btn-attempts--drive {
-  background: #e3f2fd;
-  color: #1565c0;
-  border-color: #90caf9;
-  font-weight: 600;
-}
-.btn-attempts--drive.drive-on {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-color: #a5d6a7;
-}
-.btn-attempts--drive.drive-syncing {
-  background: #fff8e1;
-  color: #f57f17;
-  border-color: #ffe082;
-}
-.btn-attempts--drive.drive-err {
-  background: #ffebee;
-  color: #c62828;
-  border-color: #ef9a9a;
-}
-
-/* Purple badge variant for attempt count */
-.attempts-count-badge--purple { background: var(--purple); }
-
 /* Compact topbar new-form button */
 .btn-new-form--compact {
   font-size: 12px;
@@ -2657,28 +2617,6 @@ button,
   .p-drag-slots-label::after { content: ' — use dropdowns below'; }
 }
 
-/* ── STEP 3: Fix Dashboard Header Button Overflow (380–520px) ──────────────
-   The 4 action buttons overflow/wrap badly on phones.
-   Wrap into a two-column layout; New Form stretches full-width.
-   ─────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .dash-header-actions {
-    flex-wrap: wrap;
-    gap: 6px;
-    width: 100%;
-  }
-  .dash-header-actions .btn-attempts {
-    flex: 1 1 calc(50% - 6px);
-    min-width: 0;
-    justify-content: center;
-    font-size: 11px;
-    padding: 8px 10px;
-  }
-  .dash-header-actions .btn-new-form {
-    width: 100%;
-    justify-content: center;
-  }
-}
 
 </style>
 <!--
@@ -2813,7 +2751,7 @@ button,
       <button class="tab-btn active admin-only" id="tab-questions" onclick="switchTab('questions')">Questions</button>
       <button class="tab-btn" id="tab-preview" onclick="switchTab('preview')">Preview</button>
     </div>
-    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="Menu">
+    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
     <div class="topbar-right" id="topbar-right">
@@ -2975,29 +2913,6 @@ button,
         <div>
           <div class="dash-heading">Your <span>Forms & Quizzes</span></div>
           <div class="dash-subtitle" id="dash-subtitle">0 forms created</div>
-        </div>
-        <div class="dash-header-actions">
-          <button class="btn-attempts btn-attempts--attempts admin-only" onclick="openAttemptsModal()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            My Attempts
-            <span class="attempts-count-badge attempts-count-badge--purple" id="dash-attempts-count" style="display:none">0</span>
-          </button>
-          <button class="btn-attempts btn-attempts--groups admin-only" onclick="openGroupsModal()" title="Organise forms into groups">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><rect x="2" y="3" width="20" height="5" rx="1.5"/><rect x="2" y="10" width="20" height="5" rx="1.5"/><rect x="2" y="17" width="20" height="5" rx="1.5"/></svg>
-            Groups
-          </button>
-          <button class="btn-attempts btn-attempts--export admin-only" onclick="openLibModal()" title="Export or Import your entire quiz library">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Export / Import
-          </button>
-          <button class="btn-attempts btn-attempts--drive" id="dash-drive-btn" onclick="openLibModal('drive')" title="Google Drive sync status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-sm"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            <span id="dash-drive-btn-label">Drive: Off</span>
-          </button>
-          <button class="btn-new-form admin-only" onclick="createNewForm()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            New Form
-          </button>
         </div>
       </div>
       <!-- Persistent dashboard jump nav — shows which region (a folder, or the
@@ -5941,20 +5856,38 @@ function showRetroToast(rescored,skipped){
 
 // §ATTEMPTS ───────────────────────────────────────────────────────────────────
 // Mobile menu (lives here because it depends on builder/dashboard state).
+// Also doubles as the desktop dashboard's overflow menu (Groups, Export/
+// Import) — see updateMobileMenu(). Follows the same accessible-menu pattern
+// as toggleDashJumpMenu()/toggleSectionBreadcrumbMenu(): aria-expanded on the
+// trigger, Escape-to-close, and (via #mobile-overlay's onclick) outside-click
+// to close.
 let _mobileMenuOpen=false;
 function toggleMobileMenu(){_mobileMenuOpen?closeMobileMenu():openMobileMenu();}
 function openMobileMenu(){
   _mobileMenuOpen=true;
   document.getElementById('mobile-menu').classList.add('open');
   document.getElementById('mobile-overlay').classList.add('open');
-  const hb=document.getElementById('hamburger-btn');if(hb)hb.classList.add('menu-open');
+  const hb=document.getElementById('hamburger-btn');
+  if(hb){hb.classList.add('menu-open');hb.setAttribute('aria-expanded','true');}
   updateMobileMenu();
+  // Deferred so the click that opened the menu doesn't immediately close it.
+  setTimeout(()=>{ document.addEventListener('keydown',_mobileMenuKeydown,true); },0);
 }
 function closeMobileMenu(){
+  const wasOpen=_mobileMenuOpen;
   _mobileMenuOpen=false;
   document.getElementById('mobile-menu').classList.remove('open');
   document.getElementById('mobile-overlay').classList.remove('open');
-  const hb=document.getElementById('hamburger-btn');if(hb)hb.classList.remove('menu-open');
+  const hb=document.getElementById('hamburger-btn');
+  if(hb){
+    hb.classList.remove('menu-open');
+    hb.setAttribute('aria-expanded','false');
+    if(wasOpen && document.getElementById('mobile-menu').contains(document.activeElement)) hb.focus();
+  }
+  document.removeEventListener('keydown',_mobileMenuKeydown,true);
+}
+function _mobileMenuKeydown(e){
+  if(e.key==='Escape'){e.preventDefault();closeMobileMenu();}
 }
 function updateMobileMenu(){
   const inBuilder=!!currentFormId;
@@ -5971,11 +5904,29 @@ function updateMobileMenu(){
     [[true,'Save & Exit',()=>{closeMobileMenu();saveAndGoBack();}],[false,'▶ Preview',()=>{closeMobileMenu();switchTab('preview');}]].forEach(([prim,txt,fn])=>{
       const b=document.createElement('button');b.className='mobile-action-btn'+(prim?' primary':'');b.textContent=txt;b.addEventListener('click',fn);acts.appendChild(b);});
   }else{
-    const dashActions=[[true,'+ New Form',()=>{closeMobileMenu();createNewForm();}]];
-    if(_isAdmin)dashActions.push([false,'⏱ My Attempts',()=>{closeMobileMenu();openAttemptsModal();}]);
+    // Below 600px the topbar's own History/New Form buttons are hidden (see
+    // .topbar-right{display:none} in that media query), so this menu is the
+    // only way to reach them there — include them only in that case. Above
+    // 600px they're always visible in the topbar itself, so listing them
+    // here too would recreate the exact duplication this menu was built to
+    // remove.
+    const topbarActionsHidden=window.matchMedia('(max-width:600px)').matches;
+    const dashActions=[];
+    if(topbarActionsHidden){
+      dashActions.push([true,'+ New Form',()=>{closeMobileMenu();createNewForm();}]);
+      if(_isAdmin)dashActions.push([false,'⏱ My Attempts',()=>{closeMobileMenu();openAttemptsModal();}]);
+    }
+    // Groups and Export/Import have no topbar equivalent at any width — this
+    // menu is their only home now (see the dashboard header cleanup).
+    if(_isAdmin){
+      dashActions.push([false,'🗂 Groups',()=>{closeMobileMenu();openGroupsModal();}]);
+      dashActions.push([false,'⇅ Export / Import',()=>{closeMobileMenu();openLibModal();}]);
+    }
     dashActions.forEach(([prim,txt,fn])=>{
       const b=document.createElement('button');b.className='mobile-action-btn'+(prim?' primary':'');b.textContent=txt;b.addEventListener('click',fn);acts.appendChild(b);});
   }
+  const actsSection=document.getElementById('mobile-actions-section');
+  if(actsSection) actsSection.style.display=acts.children.length?'block':'none';
 }
 function mobileSwitchTab(tab){
   closeMobileMenu();
@@ -7131,15 +7082,12 @@ function _renderFolderBreadcrumb(g, formCount){
 
   nav.append(rootLink, sep, folderCrumb);
 
-  // Right: actions — same as root but scoped to folder
+  // Right: actions — folder-specific only. My Attempts / New Form used to be
+  // rebuilt here too, but they duplicate the always-visible topbar buttons
+  // (#topbar-attempts-btn / #topbar-new-btn), so this now only renders the
+  // grid/list toggle, which has no topbar equivalent.
   const actions=document.createElement('div');
   actions.style.cssText='display:flex;gap:8px;align-items:center';
-
-  const attBtn=document.createElement('button');
-  attBtn.className='btn-attempts admin-only';
-  attBtn.style.cssText='background:var(--purple-dim);color:var(--purple);border-color:var(--border)';
-  _setSafeInnerHTML(attBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> My Attempts <span class="attempts-count-badge" id="dash-attempts-count" style="display:none;background:var(--purple)">0</span>');
-  attBtn.addEventListener('click', openAttemptsModal);
 
   // ── Grid / List view toggle (Google Drive style) ─────────────────────────────
   const viewToggle=document.createElement('div');
@@ -7162,16 +7110,8 @@ function _renderFolderBreadcrumb(g, formCount){
 
   viewToggle.append(gridBtn, listBtn);
 
-  const newBtn=document.createElement('button');
-  newBtn.className='btn-new-form admin-only';
-  _setSafeInnerHTML(newBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New Form');
-  newBtn.addEventListener('click', createNewForm);
-
-  actions.append(attBtn, viewToggle, newBtn);
+  actions.append(viewToggle);
   hdr.append(nav, actions);
-
-  // Sync attempt count badge
-  updateAttemptsCounts();
 }
 
 // Restore the original dash-header HTML when returning to root
@@ -7191,37 +7131,10 @@ function _restoreRootDashHeader(){
   sub.textContent='0 forms created';
   left.append(heading, sub);
 
-  // Right side (mirror of static HTML)
-  const right=document.createElement('div');
-  right.style.cssText='display:flex;gap:8px;align-items:center';
-
-  const attBtn=document.createElement('button');
-  attBtn.className='btn-attempts admin-only';
-  attBtn.style.cssText='background:var(--purple-dim);color:var(--purple);border-color:var(--border)';
-  _setSafeInnerHTML(attBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> My Attempts <span class="attempts-count-badge" id="dash-attempts-count" style="display:none;background:var(--purple)">0</span>');
-  attBtn.addEventListener('click', openAttemptsModal);
-
-  const grpBtn=document.createElement('button');
-  grpBtn.className='btn-attempts admin-only';
-  grpBtn.style.cssText='background:#f3e8ff;color:#5c35b1;border-color:#d4b8f7;font-weight:600';
-  grpBtn.title='Organise forms into groups';
-  _setSafeInnerHTML(grpBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="2" y="3" width="20" height="5" rx="1.5"/><rect x="2" y="10" width="20" height="5" rx="1.5"/><rect x="2" y="17" width="20" height="5" rx="1.5"/></svg> Groups');
-  grpBtn.addEventListener('click', openGroupsModal);
-
-  const libBtn=document.createElement('button');
-  libBtn.className='btn-attempts admin-only';
-  libBtn.style.cssText='background:#fff3e0;color:#e65100;border-color:#ffcc80;font-weight:600';
-  libBtn.title='Export or Import your entire quiz library';
-  _setSafeInnerHTML(libBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Export / Import');
-  libBtn.addEventListener('click', openLibModal);
-
-  const newBtn=document.createElement('button');
-  newBtn.className='btn-new-form admin-only';
-  _setSafeInnerHTML(newBtn,'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New Form');
-  newBtn.addEventListener('click', createNewForm);
-
-  right.append(attBtn, grpBtn, libBtn, newBtn);
-  hdr.append(left, right);
+  // No right-side action row anymore (mirrors the trimmed static HTML) —
+  // My Attempts/Drive/New Form live in the topbar and Groups/Export-Import
+  // live in the hamburger overflow menu; see updateMobileMenu().
+  hdr.append(left);
   delete hdr.dataset.mode;
 }
 
@@ -7747,6 +7660,7 @@ function openForm(id){
   _hideDashJumpNav();
   document.getElementById('builder-view').style.display='block';
   document.getElementById('topbar-tabs').style.display='flex';
+  document.body.classList.add('in-builder');
   (function(){
     const tw=document.getElementById('topbar-title-wrap');tw.innerHTML='';
     const sub=document.createElement('span');sub.className='topbar-subtitle';sub.textContent='Quiz Builder';
@@ -7857,6 +7771,7 @@ function saveAndGoBack(){
   document.getElementById('builder-view').style.display='none';
   document.getElementById('dashboard-view').style.display='block';
   document.getElementById('topbar-tabs').style.display='none';
+  document.body.classList.remove('in-builder');
   (function(){
     const tr=document.getElementById('topbar-right');tr.innerHTML='';
     const histBtn=document.createElement('button');histBtn.className='btn-attempts admin-only';histBtn.id='topbar-attempts-btn';
