@@ -233,6 +233,30 @@ body.role-viewer #integrity-banner{display:flex}
 .sort-btn svg{width:11px;height:11px}
 /* ── Dashboard search ────────────────────────────────────────────────────── */
 .dash-search-wrap{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+
+/* Persistent dashboard jump nav — sticky bar shown while scrolling a long
+   folders+ungrouped list so you always know which region you're in and can
+   jump elsewhere without scrolling back to the top. Hidden entirely when
+   there aren't enough folders/ungrouped forms to need it, or while searching
+   (search flattens the grouped view — see _updateDashJumpNav()). */
+.dash-jump-row{position:sticky;top:var(--topbar-h);z-index:39;background:var(--surface2);padding:8px 0;margin:-8px 0 2px;display:flex;align-items:center;gap:8px}
+.dash-jump-btn{display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:5px 10px 5px 11px;cursor:pointer;transition:all .15s;font:inherit;font-size:12.5px;font-weight:600;color:var(--purple);max-width:100%}
+.dash-jump-btn:hover{border-color:var(--purple-mid);background:var(--purple-dim)}
+.dash-jump-btn:focus-visible{outline:3px solid var(--purple);outline-offset:1px}
+.dash-jump-icon{width:13px;height:13px;flex-shrink:0}
+.dash-jump-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.dash-jump-chevron{width:12px;height:12px;flex-shrink:0;transition:transform .15s}
+.dash-jump-btn[aria-expanded="true"] .dash-jump-chevron{transform:rotate(180deg)}
+.dash-jump-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;max-width:min(360px,90vw);background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(30,20,60,.16);max-height:340px;overflow-y:auto;z-index:60;padding:6px 0}
+.dash-jump-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:none;padding:8px 14px;cursor:pointer;font-family:inherit;font-size:12.5px;color:var(--text)}
+.dash-jump-opt:hover,.dash-jump-opt.is-focused{background:var(--purple-dim)}
+.dash-jump-opt[aria-current="true"]{color:var(--purple);font-weight:700;background:var(--purple-dim)}
+.dash-jump-opt-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.dash-jump-opt-swatch{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.dash-jump-opt-count{flex-shrink:0;font-size:10.5px;font-weight:600;color:var(--text3);background:var(--surface2);border-radius:8px;padding:1px 7px}
+@media (max-width:600px){
+  .dash-jump-label{max-width:150px}
+}
 .dash-search-box{position:relative;flex:1;min-width:180px;max-width:360px}
 .dash-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3);pointer-events:none;flex-shrink:0}
 .dash-search-input{width:100%;border:1.5px solid var(--border);border-radius:20px;padding:7px 34px 7px 32px;font-size:13px;font-family:inherit;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s,box-shadow .15s}
@@ -1102,7 +1126,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .theme-section,.timer-section,.mode-section,.randomize-section,
   .builder-pagination,.preview-submit-row,.preview-clear,
   .page-nav-strip,.page-nav-strip-bottom,.sticky-nav-rail,.progress-steps,
-  .section-breadcrumb-row,
+  .section-breadcrumb-row,.dash-jump-row,
   .preview-progress-bar-wrap,.modal-overlay,.autosave-badge,
   .back-btn,.btn-outline,.btn-white,.attempt-del-btn,.attempt-reassign-btn,
   .attempts-clear-all,.excel-export-section,
@@ -2975,6 +2999,19 @@ button,
             New Form
           </button>
         </div>
+      </div>
+      <!-- Persistent dashboard jump nav — shows which region (a folder, or the
+           Ungrouped section) is currently in view while scrolling a long list of
+           folders/forms, and doubles as a jump-to menu. Managed entirely by
+           _updateDashJumpNav() (only shown when grouped, not searching, and there
+           are enough folders+ungrouped to make scrolling back up annoying). -->
+      <div class="dash-jump-row" id="dash-jump-row" style="display:none">
+        <button type="button" class="dash-jump-btn" id="dash-jump-btn" onclick="toggleDashJumpMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="dash-jump-menu" title="Jump to a folder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dash-jump-icon" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+          <span class="dash-jump-label" id="dash-jump-label">Folders</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="dash-jump-chevron" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dash-jump-menu" id="dash-jump-menu" role="menu" aria-label="Jump to a folder or your ungrouped forms" style="display:none"></div>
       </div>
       <div class="dash-search-wrap" id="dash-search-wrap" style="display:none">
         <div class="dash-search-box">
@@ -6644,6 +6681,7 @@ function renderDashboard(){
   // ── FOLDER INTERIOR VIEW (Google Drive model) ─────────────────────────────────
   if(_folderViewId){
     if(searchWrap)searchWrap.style.display='none';
+    _hideDashJumpNav();
     return _renderFolderView(_folderViewId);
   }
 
@@ -6656,6 +6694,7 @@ function renderDashboard(){
   if(!forms.length){
     if(sortBar)sortBar.style.display='none';
     if(searchWrap)searchWrap.style.display='none';
+    _hideDashJumpNav();
     grid.innerHTML='';
     const emp=document.createElement('div');emp.className='dash-empty';emp.id='dash-empty-state';
     _setSafeInnerHTML(emp,`
@@ -6745,6 +6784,7 @@ function renderDashboard(){
     noRes.innerHTML='<strong>No forms found</strong>No form title or description matches <em>"'+_escHtml(rawQ.trim())+'"</em>.';
     grid.innerHTML='';
     grid.appendChild(noRes);
+    _hideDashJumpNav();
     return;
   }
 
@@ -6778,6 +6818,7 @@ function renderDashboard(){
     if(ungrouped.length){
       const label=document.createElement('div');
       label.className='ungrouped-section-label';
+      label.id='dash-ungrouped-anchor';
       label.textContent='Ungrouped';
       frag.appendChild(label);
       const ugGrid=document.createElement('div');
@@ -6793,6 +6834,7 @@ function renderDashboard(){
 
   grid.innerHTML='';
   grid.appendChild(frag);
+  _updateDashJumpNav();
 }
 
 // ── Dashboard search helpers ──────────────────────────────────────────────────
@@ -7230,6 +7272,7 @@ function _navigateToRoot(){
 function _buildFolderCard(g, gForms, isOpen, _attByForm){
   const card=document.createElement('div');
   card.className='folder-card'+(isOpen?' folder-open':'');
+  card.id='dash-folder-'+g.id;
   card.style.setProperty('--g-color', g.color);
   card.dataset.groupId=g.id;
 
@@ -7305,6 +7348,204 @@ function _buildFolderCard(g, gForms, isOpen, _attByForm){
   // Click navigates into the folder (Google Drive model)
   card.addEventListener('click',()=>_openFolderView(g.id));
   return card;
+}
+
+// ── Persistent dashboard jump nav ───────────────────────────────────────────
+// Sticky bar shown above the folders/forms grid that tracks which region
+// (a specific folder, or the Ungrouped section) is currently scrolled into
+// view, and opens into a jump-to-any-folder menu on click. Mirrors the
+// section breadcrumb in the quiz builder, adapted for the dashboard's
+// folder-grid + flat-ungrouped-list layout.
+let _dashJumpActiveId=null; // group id, or the string 'ungrouped', or null
+let _dashJumpMenuOpen=false;
+let _dashJumpFocusIdx=-1;
+let _dashJumpRafPending=false;
+
+function _isDashboardRootVisible(){
+  const dv=document.getElementById('dashboard-view');
+  return !!(dv && dv.style.display!=='none' && !_folderViewId);
+}
+
+// Ordered list of jump targets exactly matching render order in renderDashboard():
+// each group in STATE.groups order, then 'ungrouped' last (if any ungrouped forms exist).
+function _getDashJumpTargets(){
+  if(!STATE.groups.length) return [];
+  const validGroupIds=new Set(STATE.groups.map(g=>g.id));
+  const counts=new Map(STATE.groups.map(g=>[g.id,0]));
+  let ungroupedCount=0;
+  forms.forEach(f=>{
+    const eg=(f.group && validGroupIds.has(f.group))?f.group:null;
+    if(eg) counts.set(eg,(counts.get(eg)||0)+1);
+    else ungroupedCount++;
+  });
+  const targets=STATE.groups.map(g=>({id:g.id,type:'folder',name:g.name,color:g.color,count:counts.get(g.id)||0}));
+  if(ungroupedCount>0) targets.push({id:'ungrouped',type:'ungrouped',name:'Ungrouped',color:null,count:ungroupedCount});
+  return targets;
+}
+
+function _scheduleDashJumpUpdate(){
+  if(_dashJumpRafPending) return;
+  _dashJumpRafPending=true;
+  requestAnimationFrame(()=>{ _dashJumpRafPending=false; _updateDashJumpNav(); });
+}
+
+function _hideDashJumpNav(){
+  const row=document.getElementById('dash-jump-row');
+  if(row && row.style.display!=='none') row.style.display='none';
+  if(_dashJumpMenuOpen) closeDashJumpMenu();
+  _dashJumpActiveId=null;
+}
+
+function _updateDashJumpNav(){
+  const row=document.getElementById('dash-jump-row');
+  if(!row) return;
+  const searchQ=((document.getElementById('dash-search-input')||{}).value||'').trim();
+  const targets=_getDashJumpTargets();
+  // Only worth showing once there's enough to actually scroll through —
+  // a couple of folders fits on one screen and doesn't need a jump nav.
+  const show=_isDashboardRootVisible() && !searchQ && targets.length>=3;
+  if(!show){ _hideDashJumpNav(); return; }
+  if(row.style.display!=='flex') row.style.display='flex';
+
+  // "Current" target = the last one (in render order) whose element has
+  // scrolled up to/past the bottom edge of this sticky bar.
+  const barBottom=row.getBoundingClientRect().bottom||0;
+  let current=targets[0];
+  for(let i=0;i<targets.length;i++){
+    const node=document.getElementById(_dashJumpTargetElId(targets[i]));
+    if(!node) break;
+    if(node.getBoundingClientRect().top<=barBottom+4) current=targets[i];
+    else break;
+  }
+  if(current.id===_dashJumpActiveId) return; // nothing changed — skip DOM writes
+  _dashJumpActiveId=current.id;
+  _renderDashJumpState(current,targets);
+}
+
+function _dashJumpTargetElId(t){
+  return t.type==='ungrouped' ? 'dash-ungrouped-anchor' : 'dash-folder-'+t.id;
+}
+
+function _renderDashJumpState(current,targets){
+  const label=document.getElementById('dash-jump-label');
+  const btn=document.getElementById('dash-jump-btn');
+  const idx=targets.findIndex(t=>t.id===current.id);
+  if(label) label.textContent=current.type==='ungrouped' ? 'Ungrouped' : current.name;
+  if(btn) btn.title='Folder '+(idx+1)+' of '+targets.length+' — click to jump to another folder';
+  if(_dashJumpMenuOpen) _renderDashJumpMenuItems(targets);
+}
+
+function toggleDashJumpMenu(){
+  if(_dashJumpMenuOpen) closeDashJumpMenu();
+  else openDashJumpMenu();
+}
+
+function openDashJumpMenu(){
+  const menu=document.getElementById('dash-jump-menu');
+  const btn=document.getElementById('dash-jump-btn');
+  const targets=_getDashJumpTargets();
+  if(!menu||!btn||!targets.length) return;
+  _renderDashJumpMenuItems(targets);
+  menu.style.display='block';
+  btn.setAttribute('aria-expanded','true');
+  _dashJumpMenuOpen=true;
+  const activeIdx=Math.max(0,targets.findIndex(t=>t.id===_dashJumpActiveId));
+  _dashJumpFocusIdx=activeIdx;
+  requestAnimationFrame(()=>_focusDashJumpOption(activeIdx));
+  // Deferred so the click that opened the menu doesn't immediately close it.
+  setTimeout(()=>{
+    document.addEventListener('mousedown',_dashJumpOutsideClick);
+    document.addEventListener('keydown',_dashJumpMenuKeydown,true);
+  },0);
+}
+
+function closeDashJumpMenu(){
+  const menu=document.getElementById('dash-jump-menu');
+  const btn=document.getElementById('dash-jump-btn');
+  const wasOpen=_dashJumpMenuOpen;
+  if(menu) menu.style.display='none';
+  if(btn){
+    btn.setAttribute('aria-expanded','false');
+    if(wasOpen && menu && menu.contains(document.activeElement)) btn.focus();
+  }
+  _dashJumpMenuOpen=false;
+  _dashJumpFocusIdx=-1;
+  document.removeEventListener('mousedown',_dashJumpOutsideClick);
+  document.removeEventListener('keydown',_dashJumpMenuKeydown,true);
+}
+
+function _dashJumpOutsideClick(e){
+  const row=document.getElementById('dash-jump-row');
+  if(row && !row.contains(e.target)) closeDashJumpMenu();
+}
+
+function _renderDashJumpMenuItems(targets){
+  const menu=document.getElementById('dash-jump-menu');
+  if(!menu) return;
+  const frag=document.createDocumentFragment();
+  targets.forEach((t,i)=>{
+    const opt=document.createElement('button');
+    opt.type='button';
+    opt.className='dash-jump-opt';
+    opt.id='dash-jump-opt-'+i;
+    opt.setAttribute('role','menuitem');
+    opt.tabIndex=-1; // focus is moved programmatically via arrow keys, not Tab
+    const isActive=t.id===_dashJumpActiveId;
+    if(isActive){opt.setAttribute('aria-current','true');opt.classList.add('is-focused');}
+    const titleEl=document.createElement('span');
+    titleEl.className='dash-jump-opt-title';
+    if(t.type==='folder'){
+      const swatch=document.createElement('span');
+      swatch.className='dash-jump-opt-swatch';
+      swatch.style.background=t.color||'var(--purple)';
+      titleEl.appendChild(swatch);
+    }
+    const nameSpan=document.createElement('span');
+    nameSpan.textContent=t.name;
+    titleEl.appendChild(nameSpan);
+    const countEl=document.createElement('span');
+    countEl.className='dash-jump-opt-count';
+    countEl.textContent=t.count+(t.count===1?' form':' forms');
+    opt.append(titleEl,countEl);
+    opt.addEventListener('click',()=>{closeDashJumpMenu();_jumpToDashTarget(t);});
+    frag.appendChild(opt);
+  });
+  menu.innerHTML='';
+  menu.appendChild(frag);
+}
+
+function _focusDashJumpOption(idx){
+  const menu=document.getElementById('dash-jump-menu');
+  if(!menu) return;
+  menu.querySelectorAll('.dash-jump-opt').forEach((el,i)=>el.classList.toggle('is-focused',i===idx));
+  const el=document.getElementById('dash-jump-opt-'+idx);
+  if(el){ el.focus({preventScroll:true}); el.scrollIntoView({block:'nearest'}); }
+}
+
+function _dashJumpMenuKeydown(e){
+  if(!_dashJumpMenuOpen) return;
+  const targets=_getDashJumpTargets();
+  if(!targets.length) return;
+  if(e.key==='Escape'){e.preventDefault();closeDashJumpMenu();return;}
+  if(e.key==='ArrowDown'){e.preventDefault();_dashJumpFocusIdx=Math.min(targets.length-1,_dashJumpFocusIdx+1);_focusDashJumpOption(_dashJumpFocusIdx);return;}
+  if(e.key==='ArrowUp'){e.preventDefault();_dashJumpFocusIdx=Math.max(0,_dashJumpFocusIdx-1);_focusDashJumpOption(_dashJumpFocusIdx);return;}
+  if(e.key==='Home'){e.preventDefault();_dashJumpFocusIdx=0;_focusDashJumpOption(0);return;}
+  if(e.key==='End'){e.preventDefault();_dashJumpFocusIdx=targets.length-1;_focusDashJumpOption(_dashJumpFocusIdx);return;}
+  if(e.key==='Enter'||e.key===' '){
+    if(_dashJumpFocusIdx>=0 && targets[_dashJumpFocusIdx]){
+      e.preventDefault();
+      const t=targets[_dashJumpFocusIdx];
+      closeDashJumpMenu();
+      _jumpToDashTarget(t);
+    }
+    return;
+  }
+  if(e.key==='Tab') closeDashJumpMenu();
+}
+
+function _jumpToDashTarget(t){
+  const el=document.getElementById(_dashJumpTargetElId(t));
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // Legacy toggle — now delegates to navigation open/close
@@ -7503,6 +7744,7 @@ function openForm(id){
   const stripe=document.getElementById('hdr-stripe');if(stripe)stripe.style.background=f.color||'var(--purple)';
   document.documentElement.style.setProperty('--form-accent',f.color||'#5c35b1');
   document.getElementById('dashboard-view').style.display='none';
+  _hideDashJumpNav();
   document.getElementById('builder-view').style.display='block';
   document.getElementById('topbar-tabs').style.display='flex';
   (function(){
@@ -11123,6 +11365,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   // questions tab isn't visible, so this is safe to leave registered globally.
   window.addEventListener('scroll',_scheduleSectionBreadcrumbUpdate,{passive:true});
   window.addEventListener('resize',_scheduleSectionBreadcrumbUpdate,{passive:true});
+  // Same treatment for the dashboard folder/ungrouped jump nav — cheap no-op
+  // whenever the root dashboard grid isn't visible.
+  window.addEventListener('scroll',_scheduleDashJumpUpdate,{passive:true});
+  window.addEventListener('resize',_scheduleDashJumpUpdate,{passive:true});
 });
 
 // §SHORTCUTS ──────────────────────────────────────────────────────────────────
