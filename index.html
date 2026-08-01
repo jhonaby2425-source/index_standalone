@@ -328,6 +328,11 @@ body.role-viewer #integrity-banner{display:flex}
 .q-label-input::placeholder{color:var(--text3)}
 .type-select{border:1.5px solid var(--border);border-radius:6px;font-size:12px;color:var(--text2);padding:6px 8px;outline:none;cursor:pointer;background:var(--surface);min-width:150px}
 .type-select:focus{border-color:var(--purple)}
+.move-section-select{border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;color:var(--text2);padding:5px 8px 5px 6px;outline:none;cursor:pointer;background:var(--surface2);max-width:170px}
+.move-section-select:hover{border-color:var(--purple-mid)}
+.move-section-select:focus{border-color:var(--purple)}
+.move-section-select-wrap{display:flex;align-items:center;gap:4px;margin-right:auto;min-width:0}
+.move-section-select-wrap svg{flex:none;color:var(--text3)}
 .q-num{font-size:10px;color:var(--text3);margin-top:3px;font-weight:500}
 .correct-ans-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;background:var(--green-bg);border-radius:7px;border:1px solid var(--green-border)}
 .correct-ans-label{font-size:11px;color:var(--green);font-weight:600;white-space:nowrap}
@@ -776,7 +781,9 @@ body.role-viewer #integrity-banner{display:flex}
   .topbar-logo{width:26px;height:26px;flex-shrink:0}
   .hamburger-btn{flex-shrink:0}
   .q-card-body{padding:12px 12px 8px}
-  .q-footer{padding:6px 12px 10px}
+  .q-footer{padding:6px 12px 10px;flex-wrap:wrap;row-gap:8px}
+  .move-section-select-wrap{width:100%;order:-1;margin-right:0}
+  .move-section-select{max-width:none;width:100%}
   .section-body{padding:10px 12px 8px}
   .section-footer{padding:4px 12px 8px}
   .theme-section,.timer-section,.mode-section,.randomize-section{padding:12px 12px}
@@ -963,7 +970,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Quiz-wide search (finds text in ANY section/question, not just the ones
    currently rendered by the virtual scroller — see renderQSearchResults()). */
-.qsearch-wrap{position:sticky;top:var(--topbar-h);z-index:40;background:var(--surface2);padding:8px 0;margin:-8px 0 2px;display:flex;align-items:center;gap:8px}
+.qsearch-wrap{position:sticky;top:var(--topbar-h);z-index:40;background:var(--surface2);padding:8px 0;margin:-8px 0 2px;display:flex;flex-direction:column;gap:6px}
+.qsearch-row{display:flex;align-items:center;gap:8px;position:relative}
 .qsearch-box{position:relative;flex:1;display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:0 10px;box-shadow:0 1px 4px rgba(92,53,177,.06)}
 .qsearch-box:focus-within{border-color:var(--purple);box-shadow:0 0 0 3px rgba(92,53,177,.1)}
 .qsearch-icon{width:14px;height:14px;color:var(--text3);flex-shrink:0}
@@ -983,6 +991,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .qsearch-empty{padding:16px 14px;font-size:12.5px;color:var(--text3);text-align:center}
 @keyframes qcard-flash-kf{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--purple),0 4px 16px rgba(92,53,177,.25)}}
 .qcard-flash{animation:qcard-flash-kf 1.4s ease}
+
+/* Persistent section breadcrumb — sticky nav shown while scrolling a long
+   quiz so you always know which section you're in and can jump elsewhere
+   without scrolling back up. Hidden entirely on short/unsectioned quizzes
+   (see _updateSectionBreadcrumb() for the show/hide threshold). */
+.section-breadcrumb-row{position:relative;display:flex;align-items:center;gap:8px;animation:sticky-in .18s ease}
+.section-breadcrumb-btn{display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:5px 10px 5px 11px;cursor:pointer;transition:all .15s;font:inherit;font-size:12.5px;font-weight:600;color:var(--form-accent,var(--purple));max-width:70%}
+.section-breadcrumb-btn:hover{border-color:var(--form-accent,var(--purple-mid));background:var(--purple-dim)}
+.section-breadcrumb-btn:focus-visible{outline:3px solid var(--form-accent,var(--purple));outline-offset:1px}
+.section-breadcrumb-icon{width:13px;height:13px;flex-shrink:0}
+.section-breadcrumb-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.section-breadcrumb-chevron{width:12px;height:12px;flex-shrink:0;transition:transform .15s}
+.section-breadcrumb-btn[aria-expanded="true"] .section-breadcrumb-chevron{transform:rotate(180deg)}
+.section-breadcrumb-progress{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;min-width:36px}
+.section-breadcrumb-progress-fill{height:100%;width:0;background:var(--form-accent,var(--purple));border-radius:2px;transition:width .2s ease}
+.section-breadcrumb-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;max-width:min(360px,90vw);background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(30,20,60,.16);max-height:320px;overflow-y:auto;z-index:60;padding:6px 0}
+.section-breadcrumb-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:none;padding:8px 14px;cursor:pointer;font-family:inherit;font-size:12.5px;color:var(--text)}
+.section-breadcrumb-opt:hover,.section-breadcrumb-opt.is-focused{background:var(--purple-dim)}
+.section-breadcrumb-opt[aria-selected="true"]{color:var(--form-accent,var(--purple));font-weight:700;background:var(--purple-dim)}
+.section-breadcrumb-opt-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.section-breadcrumb-opt-count{flex-shrink:0;font-size:10.5px;font-weight:600;color:var(--text3);background:var(--surface2);border-radius:8px;padding:1px 7px}
+@media (max-width:600px){
+  .section-breadcrumb-label{max-width:130px}
+  .section-breadcrumb-progress{display:none}
+}
 
 /* Bank modal */
 .bank-modal{max-width:600px;width:100%}
@@ -1069,6 +1102,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .theme-section,.timer-section,.mode-section,.randomize-section,
   .builder-pagination,.preview-submit-row,.preview-clear,
   .page-nav-strip,.page-nav-strip-bottom,.sticky-nav-rail,.progress-steps,
+  .section-breadcrumb-row,
   .preview-progress-bar-wrap,.modal-overlay,.autosave-badge,
   .back-btn,.btn-outline,.btn-white,.attempt-del-btn,.attempt-reassign-btn,
   .attempts-clear-all,.excel-export-section,
@@ -3104,13 +3138,30 @@ button,
           <div class="mode-grid" id="mode-grid"></div>
         </div>
         <div class="qsearch-wrap" id="qsearch-wrap">
-          <div class="qsearch-box">
-            <svg class="qsearch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="qsearch-input" id="qsearch-input" type="search" placeholder="Find in this quiz… (question text, answers, options — searches every section)" oninput="renderQSearchResults(this.value)" onkeydown="qSearchKeydown(event)" aria-label="Search this quiz">
-            <span class="qsearch-count" id="qsearch-count"></span>
-            <button class="qsearch-clear" id="qsearch-clear" style="display:none" onclick="clearQSearch()" aria-label="Clear search" title="Clear search">×</button>
+          <!-- Persistent section breadcrumb — shows which section is currently in view
+               while scrolling a long quiz, and doubles as a jump-to-section menu.
+               Visibility/content are managed entirely by _updateSectionBreadcrumb()
+               (only shown once a quiz has 2+ sections and 8+ items). -->
+          <div class="section-breadcrumb-row" id="section-breadcrumb-row" style="display:none">
+            <button type="button" class="section-breadcrumb-btn" id="section-breadcrumb-btn" onclick="toggleSectionBreadcrumbMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="section-breadcrumb-menu" title="Jump to a section">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-breadcrumb-icon" aria-hidden="true"><rect x="3" y="3" width="18" height="5" rx="1.5"/><rect x="3" y="11" width="18" height="10" rx="1.5"/></svg>
+              <span class="section-breadcrumb-label" id="section-breadcrumb-label">Section</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="section-breadcrumb-chevron" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="section-breadcrumb-progress" aria-hidden="true">
+              <div class="section-breadcrumb-progress-fill" id="section-breadcrumb-progress-fill"></div>
+            </div>
+            <div class="section-breadcrumb-menu" id="section-breadcrumb-menu" role="menu" aria-label="Sections in this quiz" style="display:none"></div>
           </div>
-          <div class="qsearch-results" id="qsearch-results" style="display:none"></div>
+          <div class="qsearch-row">
+            <div class="qsearch-box">
+              <svg class="qsearch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="qsearch-input" id="qsearch-input" type="search" placeholder="Find in this quiz… (question text, answers, options — searches every section)" oninput="renderQSearchResults(this.value)" onkeydown="qSearchKeydown(event)" aria-label="Search this quiz">
+              <span class="qsearch-count" id="qsearch-count"></span>
+              <button class="qsearch-clear" id="qsearch-clear" style="display:none" onclick="clearQSearch()" aria-label="Clear search" title="Clear search">×</button>
+            </div>
+            <div class="qsearch-results" id="qsearch-results" style="display:none"></div>
+          </div>
         </div>
         <div id="questions-list"></div>
         <div class="add-q-bar">
@@ -3504,7 +3555,8 @@ button,
 //  §SHARE          ln 4044   Share / export single form modal
 //  §EXPORT_LIB     ln 4168   exportLibrary, importLibrary, openLibModal
 //  §ACCESSIBILITY  ln 4402   Focus trap (_trapFocus / _releaseFocusTrap)
-//  §TESTS          ln 4475   Inline scoring unit tests (runs on load, check console)
+//  §TESTS          ln 4475   Scoring unit tests (inline, single file) — only
+//                            RUN in debug/dev contexts (?debug=1, localhost, NODE_ENV)
 // ══════════════════════════════════════════════════════════════════════════════
 
 // §STATE ──────────────────────────────────────────────────────────────────────
@@ -3777,6 +3829,53 @@ function _allocFormId(){
   return _nextFormId++;
 }
 
+// ── Minimal allowlist-based HTML sanitizer ────────────────────────────────────
+// Used by _setSafeHTML()'s fallback branch (browsers without the native
+// Sanitizer API). Parses `html` in an inert document (via DOMParser, so
+// nothing executes during parsing), then walks the resulting tree and:
+//   • drops any element whose tag isn't on _SANITIZE_ALLOWED_TAGS (this also
+//     removes <script>, <style>, <iframe>, <object>, <embed>, <link>, etc.
+//     along with their entire subtree)
+//   • strips every `on*` event-handler attribute
+//   • strips `href`/`xlink:href` values using a javascript:/data: scheme
+//   • keeps a small allowlist of everything else actually used in this file
+//     (SVG icon markup, layout/formatting tags, aria-*/data-* attributes)
+// The allowlist covers exactly the tags/attributes this file's own
+// _setSafeHTML() call sites use (svg icon markup, divs/spans/headings,
+// basic inline formatting) plus a small safe margin for future call sites.
+const _SANITIZE_ALLOWED_TAGS = new Set([
+  'div','span','p','h1','h2','h3','h4','h5','h6','strong','em','b','i','u',
+  'small','br','hr','mark','kbd','code','pre','ul','ol','li','a','button',
+  'label','table','thead','tbody','tr','td','th',
+  'svg','path','circle','rect','line','polyline','polygon','ellipse','g',
+  'text','tspan','defs','use'
+]);
+const _SANITIZE_URL_ATTRS = new Set(['href','xlink:href']);
+function _sanitizeHtmlToNode(html) {
+  const parsed = new DOMParser().parseFromString(String(html), 'text/html');
+  const root = parsed.body;
+  (function clean(node) {
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === 8 /* COMMENT_NODE */) { child.remove(); return; }
+      if (child.nodeType !== 1 /* ELEMENT_NODE */) return; // keep text nodes as-is
+      const tag = child.tagName.toLowerCase();
+      if (!_SANITIZE_ALLOWED_TAGS.has(tag)) { child.remove(); return; }
+      Array.from(child.attributes).forEach(attr => {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith('on')) { child.removeAttribute(attr.name); return; }
+        if (_SANITIZE_URL_ATTRS.has(name)) {
+          const val = attr.value.trim().toLowerCase();
+          if (val.startsWith('javascript:') || val.startsWith('data:text/html')) {
+            child.removeAttribute(attr.name);
+          }
+        }
+      });
+      clean(child);
+    });
+  })(root);
+  return root; // childNodes are fully sanitized and safe to move into the live document
+}
+
 // ── Safe innerHTML helper ─────────────────────────────────────────────────────
 // Direct innerHTML assignment is risky: one accidental interpolation of user
 // data causes XSS. _setSafeHTML() is a deliberate choke-point backed by a real
@@ -3786,21 +3885,19 @@ function _allocFormId(){
 // Strategy:
 //   1. Prefer the native Sanitizer API (Chrome 105+, Firefox 135+) — strips
 //      script elements, event-handler attributes, and javascript: URLs by default.
-//   2. Fall back to raw innerHTML assignment only for older browsers where all
-//      current call sites are still audited to pass fully-static markup.
-//
-// A compatibility shim or DOMPurify can replace the fallback branch if you need
-// sanitised output on older browsers:
-//   https://github.com/cure53/DOMPurify
+//   2. Fall back to the allowlist sanitizer above for browsers without native
+//      Sanitizer support — no raw innerHTML assignment on any code path.
 function _setSafeHTML(el, html) {
   if (typeof window !== 'undefined' && typeof window.Sanitizer === 'function') {
     // Native Sanitizer API — strips <script>, on* attributes, javascript: hrefs, etc.
     el.setHTML(html, { sanitizer: new window.Sanitizer() });
   } else {
-    // Fallback for browsers without Sanitizer API support.
-    // All existing call sites pass fully-static markup; this branch is safe
-    // under that contract but does NOT protect against future dynamic strings.
-    el.innerHTML = html;
+    // Fallback: run through the allowlist sanitizer above, then move the
+    // already-sanitized nodes into `el` directly (no second unsanitized
+    // innerHTML parse of untrusted markup).
+    const cleanRoot = _sanitizeHtmlToNode(html);
+    el.textContent = '';
+    while (cleanRoot.firstChild) el.appendChild(cleanRoot.firstChild);
   }
 }
 
@@ -6568,39 +6665,47 @@ function renderDashboard(){
       <p class="role-viewer-only">There's nothing here to test yet — check back once the admin has published a quiz.</p>
       <div class="admin-only">
         <div class="dash-empty-divider"><span>or start from a template</span></div>
-        <div class="dash-tpl-grid">
-          <button class="dash-tpl-card" onclick="createFromTemplate('quiz')" title="Multiple choice quiz with scoring">
+        <div class="dash-tpl-grid" id="dash-tpl-grid">
+          <button class="dash-tpl-card" data-tpl="quiz" title="Multiple choice quiz with scoring">
             <div class="dash-tpl-icon">🎯</div>
             <div class="dash-tpl-name">Graded Quiz</div>
             <div class="dash-tpl-desc">Multiple choice with auto-scoring</div>
           </button>
-          <button class="dash-tpl-card" onclick="createFromTemplate('truefalse')" title="True / False quiz">
+          <button class="dash-tpl-card" data-tpl="truefalse" title="True / False quiz">
             <div class="dash-tpl-icon">✓✗</div>
             <div class="dash-tpl-name">True / False</div>
             <div class="dash-tpl-desc">Quick binary-answer assessment</div>
           </button>
-          <button class="dash-tpl-card" onclick="createFromTemplate('survey')" title="Open-ended feedback form">
+          <button class="dash-tpl-card" data-tpl="survey" title="Open-ended feedback form">
             <div class="dash-tpl-icon">📝</div>
             <div class="dash-tpl-name">Survey / Form</div>
             <div class="dash-tpl-desc">Open-ended questions, no scoring</div>
           </button>
-          <button class="dash-tpl-card" onclick="createFromTemplate('translation')" title="Language translation practice">
+          <button class="dash-tpl-card" data-tpl="translation" title="Language translation practice">
             <div class="dash-tpl-icon">🌐</div>
             <div class="dash-tpl-name">Translation</div>
             <div class="dash-tpl-desc">Sentence translation practice set</div>
           </button>
-          <button class="dash-tpl-card" onclick="createFromTemplate('matching')" title="Matching pairs quiz">
+          <button class="dash-tpl-card" data-tpl="matching" title="Matching pairs quiz">
             <div class="dash-tpl-icon">⇌</div>
             <div class="dash-tpl-name">Matching</div>
             <div class="dash-tpl-desc">Match terms to details</div>
           </button>
-          <button class="dash-tpl-card" onclick="createFromTemplate('blank')" title="Start from scratch">
+          <button class="dash-tpl-card" data-tpl="blank" title="Start from scratch">
             <div class="dash-tpl-icon">＋</div>
             <div class="dash-tpl-name">Blank</div>
             <div class="dash-tpl-desc">Start from an empty canvas</div>
           </button>
         </div>
       </div>`);
+    // Templates above used inline onclick="" before; _setSafeHTML's sanitizer
+    // (native Sanitizer API AND the new allowlist fallback) strips on*
+    // attributes on principle, so bind via one delegated listener instead.
+    const tplGrid=emp.querySelector('#dash-tpl-grid');
+    if(tplGrid)tplGrid.addEventListener('click',e=>{
+      const card=e.target.closest('.dash-tpl-card');
+      if(card&&tplGrid.contains(card))createFromTemplate(card.dataset.tpl);
+    });
     grid.appendChild(emp);return;
   }
 
@@ -6910,11 +7015,20 @@ function _openFolderRowMenu(e, f, anchor){
     { label:'⏱ History',    fn:()=>viewFormAttempts(f.id) },
   ];
 
+  // Dismiss on outside click / Escape — declared before items.forEach so the
+  // item-click handler below can also call cleanup() (previously only the
+  // outside-click and Escape paths removed these document-level listeners,
+  // so dismissing via a menu item leaked both listeners on every open).
+  const cleanup=()=>{
+    document.removeEventListener('mousedown',close);
+    document.removeEventListener('keydown',esc);
+  };
+
   items.forEach(item=>{
     const btn=document.createElement('button');
     btn.className='flist-menu-item'+(item.danger?' danger':'');
     btn.textContent=item.label;
-    btn.addEventListener('click',()=>{ menu.remove(); item.fn(); });
+    btn.addEventListener('click',()=>{ cleanup(); menu.remove(); item.fn(); });
     menu.appendChild(btn);
   });
 
@@ -6928,14 +7042,14 @@ function _openFolderRowMenu(e, f, anchor){
   menu.style.top=top+'px';
   menu.style.left=Math.min(rect.left+window.scrollX-120, window.innerWidth-180+window.scrollX)+'px';
 
-  // Dismiss on outside click / Escape
   const close=(ev)=>{
-    if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener('mousedown',close); }
+    if(!menu.contains(ev.target)){ cleanup(); menu.remove(); }
   };
+  function esc(e2){
+    if(e2.key==='Escape'){ cleanup(); menu.remove(); }
+  }
   setTimeout(()=>document.addEventListener('mousedown',close),0);
-  document.addEventListener('keydown',function esc(e2){
-    if(e2.key==='Escape'){ menu.remove(); document.removeEventListener('keydown',esc); }
-  });
+  document.addEventListener('keydown',esc);
 }
 
 // ── Set folder view mode and re-render ────────────────────────────────────────
@@ -7481,6 +7595,10 @@ function saveCurrentForm(){
 function saveAndGoBack(){
   const fab=document.getElementById('fab-goto-last');
   if(fab) fab.style.display='none';
+  const breadcrumbRow=document.getElementById('section-breadcrumb-row');
+  if(breadcrumbRow) breadcrumbRow.style.display='none';
+  if(_breadcrumbMenuOpen) closeSectionBreadcrumbMenu();
+  _breadcrumbActiveSectionId=null;
   saveCurrentForm();
   if(currentFormId) persistFormById(currentFormId);
   persistQuestions();
@@ -7666,6 +7784,12 @@ function switchTab(tab){
   // Always hide the FAB when switching tabs; updateStats() will re-show it for the questions tab
   const fab=document.getElementById('fab-goto-last');
   if(fab) fab.style.display='none';
+  // Same treatment for the section breadcrumb — updateStats() only re-shows it on
+  // the questions branch below, so hide (and close its menu) unconditionally here.
+  const breadcrumbRow=document.getElementById('section-breadcrumb-row');
+  if(breadcrumbRow) breadcrumbRow.style.display='none';
+  if(_breadcrumbMenuOpen) closeSectionBreadcrumbMenu();
+  _breadcrumbActiveSectionId=null;
   if(tab==='preview'){
     if(wasOnPreview){
       // Re-clicking the Preview tab while already there shouldn't wipe an
@@ -8157,6 +8281,8 @@ function updateStats(){
   if(fab) fab.style.display=(currentFormId&&items.length>=5&&isQuestionsTabActive)?'flex':'none';
   // Rebuild section jump dropdown whenever stats refresh
   _rebuildSectionJumpDropdown();
+  // Refresh the persistent section breadcrumb (visibility + current-section label)
+  _updateSectionBreadcrumb();
 }
 
 // Rebuild the section-jump <select> in the builder toolbar AND the FAB.
@@ -8192,11 +8318,216 @@ function _rebuildSectionJumpDropdown(){
   });
 }
 
+// ── Persistent section breadcrumb ──────────────────────────────────────────
+// A sticky bar (rendered right above the quiz-wide search box) that always
+// shows which section is currently in view while scrolling a long quiz, and
+// opens into a jump-to-any-section menu on click. Only shown once a quiz has
+// enough sections/items that scrolling back up to the toolbar dropdown would
+// actually be annoying — see the `show` check in _updateSectionBreadcrumb().
+let _breadcrumbActiveSectionId=null;
+let _breadcrumbMenuOpen=false;
+let _breadcrumbFocusIdx=-1;
+let _breadcrumbRafPending=false;
+
+function _getBuilderSections(){
+  return items.filter(it=>it.kind==='section');
+}
+
+// Question count per section, computed in one pass over the flat items[]
+// array (a section "owns" every question that follows it up to the next
+// section). Used for the "(N questions)" hint in the jump menu.
+function _sectionQuestionCounts(){
+  const counts=new Map();
+  let curId=null;
+  items.forEach(it=>{
+    if(it.kind==='section'){curId=it.id;counts.set(it.id,0);}
+    else if(curId!=null){counts.set(curId,(counts.get(curId)||0)+1);}
+  });
+  return counts;
+}
+
+function _isBuilderQuestionsTabVisible(){
+  const qt=document.getElementById('questions-tab');
+  return !!(currentFormId && qt && qt.style.display!=='none');
+}
+
+// rAF-throttled entry point for the scroll/resize listeners — cheap to call
+// often since it early-exits via the `show` check before doing any DOM reads.
+function _scheduleSectionBreadcrumbUpdate(){
+  if(_breadcrumbRafPending) return;
+  _breadcrumbRafPending=true;
+  requestAnimationFrame(()=>{ _breadcrumbRafPending=false; _updateSectionBreadcrumb(); });
+}
+
+function _updateSectionBreadcrumb(){
+  const row=document.getElementById('section-breadcrumb-row');
+  if(!row) return;
+  const sections=_getBuilderSections();
+  const show=_isBuilderQuestionsTabVisible() && sections.length>=2 && items.length>=8;
+  if(!show){
+    if(row.style.display!=='none') row.style.display='none';
+    if(_breadcrumbMenuOpen) closeSectionBreadcrumbMenu();
+    _breadcrumbActiveSectionId=null;
+    return;
+  }
+  if(row.style.display!=='flex') row.style.display='flex';
+
+  // "Current" section = the last section (in document order) whose card has
+  // scrolled up to/past the bottom edge of this sticky bar. Sections the
+  // virtual scroller hasn't rendered yet are treated as "not reached" —
+  // safe, since the user can't have scrolled past a section that isn't
+  // rendered yet either.
+  const barBottom=row.getBoundingClientRect().bottom||0;
+  let current=sections[0];
+  for(let i=0;i<sections.length;i++){
+    const card=document.getElementById('qcard-'+sections[i].id);
+    if(!card) break;
+    if(card.getBoundingClientRect().top<=barBottom+4) current=sections[i];
+    else break;
+  }
+  if(current.id===_breadcrumbActiveSectionId) return; // nothing changed — skip DOM writes
+  _breadcrumbActiveSectionId=current.id;
+  _renderSectionBreadcrumbState(current,sections);
+}
+
+function _renderSectionBreadcrumbState(current,sections){
+  const idx=sections.findIndex(s=>s.id===current.id);
+  const label=document.getElementById('section-breadcrumb-label');
+  const fill=document.getElementById('section-breadcrumb-progress-fill');
+  const btn=document.getElementById('section-breadcrumb-btn');
+  const title=current.title&&current.title.trim()?current.title.trim():'(Untitled section '+(idx+1)+')';
+  if(label) label.textContent='§'+(idx+1)+' — '+title;
+  if(fill) fill.style.width=(((idx+1)/sections.length)*100)+'%';
+  if(btn) btn.title='Section '+(idx+1)+' of '+sections.length+' — click to jump to another section';
+  if(_breadcrumbMenuOpen){
+    _renderSectionBreadcrumbMenuItems(sections);
+    // Rebuilding the menu just replaced the focused button's DOM node — if
+    // an item had keyboard focus, restore it so arrow-key navigation isn't
+    // silently broken by a scroll-triggered active-section change.
+    if(_breadcrumbFocusIdx>=0 && document.activeElement && document.activeElement.classList.contains('section-breadcrumb-opt')){
+      _focusBreadcrumbOption(_breadcrumbFocusIdx);
+    }
+  }
+}
+
+function toggleSectionBreadcrumbMenu(){
+  if(_breadcrumbMenuOpen) closeSectionBreadcrumbMenu();
+  else openSectionBreadcrumbMenu();
+}
+
+function openSectionBreadcrumbMenu(){
+  const menu=document.getElementById('section-breadcrumb-menu');
+  const btn=document.getElementById('section-breadcrumb-btn');
+  const sections=_getBuilderSections();
+  if(!menu||!btn||!sections.length) return;
+  _renderSectionBreadcrumbMenuItems(sections);
+  menu.style.display='block';
+  btn.setAttribute('aria-expanded','true');
+  _breadcrumbMenuOpen=true;
+  const activeIdx=Math.max(0,sections.findIndex(s=>s.id===_breadcrumbActiveSectionId));
+  _breadcrumbFocusIdx=activeIdx;
+  requestAnimationFrame(()=>_focusBreadcrumbOption(activeIdx));
+  // Deferred so the click that opened the menu doesn't immediately close it.
+  setTimeout(()=>{
+    document.addEventListener('mousedown',_breadcrumbOutsideClick);
+    document.addEventListener('keydown',_breadcrumbMenuKeydown,true);
+  },0);
+}
+
+function closeSectionBreadcrumbMenu(){
+  const menu=document.getElementById('section-breadcrumb-menu');
+  const btn=document.getElementById('section-breadcrumb-btn');
+  const wasOpen=_breadcrumbMenuOpen;
+  if(menu) menu.style.display='none';
+  if(btn){
+    btn.setAttribute('aria-expanded','false');
+    // Return focus to the trigger so keyboard users (Escape, item selection)
+    // aren't left with focus on a now-hidden/detached menu item.
+    if(wasOpen && menu && menu.contains(document.activeElement)) btn.focus();
+  }
+  _breadcrumbMenuOpen=false;
+  _breadcrumbFocusIdx=-1;
+  document.removeEventListener('mousedown',_breadcrumbOutsideClick);
+  document.removeEventListener('keydown',_breadcrumbMenuKeydown,true);
+}
+
+function _breadcrumbOutsideClick(e){
+  const row=document.getElementById('section-breadcrumb-row');
+  if(row && !row.contains(e.target)) closeSectionBreadcrumbMenu();
+}
+
+function _renderSectionBreadcrumbMenuItems(sections){
+  const menu=document.getElementById('section-breadcrumb-menu');
+  if(!menu) return;
+  const counts=_sectionQuestionCounts();
+  const frag=document.createDocumentFragment();
+  sections.forEach((s,i)=>{
+    const opt=document.createElement('button');
+    opt.type='button';
+    opt.className='section-breadcrumb-opt';
+    opt.id='section-breadcrumb-opt-'+i;
+    opt.setAttribute('role','menuitem');
+    opt.tabIndex=-1; // focus is moved programmatically via arrow keys, not Tab
+    const isActive=s.id===_breadcrumbActiveSectionId;
+    if(isActive){opt.setAttribute('aria-current','true');opt.classList.add('is-focused');}
+    const titleEl=document.createElement('span');
+    titleEl.className='section-breadcrumb-opt-title';
+    titleEl.textContent='§'+(i+1)+' — '+(s.title&&s.title.trim()?s.title.trim():'(Untitled section)');
+    const countEl=document.createElement('span');
+    countEl.className='section-breadcrumb-opt-count';
+    const n=counts.get(s.id)||0;
+    countEl.textContent=n+(n===1?' question':' questions');
+    opt.append(titleEl,countEl);
+    opt.addEventListener('click',()=>{closeSectionBreadcrumbMenu();_jumpToSectionId(s.id);});
+    frag.appendChild(opt);
+  });
+  menu.innerHTML='';
+  menu.appendChild(frag);
+}
+
+function _focusBreadcrumbOption(idx){
+  const menu=document.getElementById('section-breadcrumb-menu');
+  if(!menu) return;
+  menu.querySelectorAll('.section-breadcrumb-opt').forEach((el,i)=>el.classList.toggle('is-focused',i===idx));
+  const el=document.getElementById('section-breadcrumb-opt-'+idx);
+  if(el){
+    el.focus({preventScroll:true});
+    el.scrollIntoView({block:'nearest'});
+  }
+}
+
+function _breadcrumbMenuKeydown(e){
+  if(!_breadcrumbMenuOpen) return;
+  const sections=_getBuilderSections();
+  if(!sections.length) return;
+  if(e.key==='Escape'){e.preventDefault();closeSectionBreadcrumbMenu();return;}
+  if(e.key==='ArrowDown'){e.preventDefault();_breadcrumbFocusIdx=Math.min(sections.length-1,_breadcrumbFocusIdx+1);_focusBreadcrumbOption(_breadcrumbFocusIdx);return;}
+  if(e.key==='ArrowUp'){e.preventDefault();_breadcrumbFocusIdx=Math.max(0,_breadcrumbFocusIdx-1);_focusBreadcrumbOption(_breadcrumbFocusIdx);return;}
+  if(e.key==='Home'){e.preventDefault();_breadcrumbFocusIdx=0;_focusBreadcrumbOption(0);return;}
+  if(e.key==='End'){e.preventDefault();_breadcrumbFocusIdx=sections.length-1;_focusBreadcrumbOption(_breadcrumbFocusIdx);return;}
+  if(e.key==='Enter'||e.key===' '){
+    if(_breadcrumbFocusIdx>=0 && sections[_breadcrumbFocusIdx]){
+      e.preventDefault();
+      const id=sections[_breadcrumbFocusIdx].id;
+      closeSectionBreadcrumbMenu();
+      _jumpToSectionId(id);
+    }
+    return;
+  }
+  if(e.key==='Tab') closeSectionBreadcrumbMenu();
+}
+
 // Called when the user picks a section from the jump dropdown.
 function jumpToSection(selectEl){
   const id=parseInt(selectEl.value);
   if(!id) return;
   selectEl.value=''; // reset to placeholder so it's always a "jump" action
+  _jumpToSectionId(id);
+}
+
+// Shared scroll-to-section logic, reused by the toolbar/FAB <select> dropdowns
+// (jumpToSection above) and the persistent section breadcrumb menu below.
+function _jumpToSectionId(id){
   const sItem=items.find(it=>it.id===id&&it.kind==='section');
   if(!sItem) return;
   jumpToItemPage(id); // expand virtual scroll if needed
@@ -8821,7 +9152,37 @@ function renderQCardNode(q,i){
   const insSectionBtn=_makeBtn('q-icon-btn js-insert-section-btn','⊞ Section here',()=>addSection(q.id));
   insSectionBtn.title='Insert a new section immediately above this question';
   insSectionBtn.setAttribute('aria-label','Insert section above this question');
-  footer.append(reqLabel,dupBtn,insSectionBtn,delBtn);
+
+  // "Move to section" — jumps this question directly under any section in
+  // the form, however far away, instead of nudging it one step at a time.
+  // margin-right:auto (see .move-section-select-wrap) pins it to the start
+  // of the footer while the existing buttons stay right-aligned.
+  const moveSecWrap=document.createElement('div');moveSecWrap.className='move-section-select-wrap';
+  const moveSecIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  moveSecIcon.setAttribute('viewBox','0 0 16 16');moveSecIcon.setAttribute('width','13');moveSecIcon.setAttribute('height','13');moveSecIcon.setAttribute('aria-hidden','true');
+  moveSecIcon.innerHTML='<path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/>';
+  const moveSecSelect=document.createElement('select');moveSecSelect.className='move-section-select';
+  moveSecSelect.setAttribute('aria-label','Move this question to section');
+  const sectionsList=items.filter(it=>it.kind==='section');
+  const topOpt=document.createElement('option');topOpt.value='__top__';topOpt.textContent='No section (top)';
+  moveSecSelect.appendChild(topOpt);
+  sectionsList.forEach(s=>{
+    const o=document.createElement('option');o.value=s.id;
+    o.textContent=_plainTextTitle(s.title)||'Untitled section';
+    moveSecSelect.appendChild(o);
+  });
+  moveSecSelect.value=String(_currentSectionIdForItem(q.id));
+  moveSecSelect.disabled=sectionsList.length===0;
+  moveSecSelect.title=sectionsList.length===0?'Add a section to enable moving questions between sections':'Move this question to another section';
+  moveSecSelect.addEventListener('click',e=>e.stopPropagation());
+  moveSecSelect.addEventListener('change',e=>{
+    e.stopPropagation();
+    const val=e.target.value;
+    moveQuestionToSection(q.id,val==='__top__'?'__top__':(isNaN(Number(val))?val:Number(val)));
+  });
+  moveSecWrap.append(moveSecIcon,moveSecSelect);
+
+  footer.append(moveSecWrap,reqLabel,dupBtn,insSectionBtn,delBtn);
 
   // Touch drag polyfill — pointer events work on mobile where HTML5 drag events don't
   (function attachTouchDrag(handle, card) {
@@ -8895,6 +9256,58 @@ function moveItemById(id,delta){
   });
 }
 
+// Returns the id of the section a given item currently sits under, or
+// '__top__' if it appears before the first section marker / no sections
+// exist yet. Used to pre-select the right option in the "Move to section"
+// dropdown on each question card.
+function _currentSectionIdForItem(id){
+  const idx=items.findIndex(it=>it.id===id);
+  if(idx===-1)return '__top__';
+  for(let i=idx-1;i>=0;i--){
+    if(items[i].kind==='section')return items[i].id;
+  }
+  return '__top__';
+}
+
+// Jumps a question directly to another section — the "Move to section"
+// dropdown on each question card. This exists because moveItemById() only
+// shifts an item by one position at a time; on a form with dozens of
+// sections and hundreds of questions, walking a question across the whole
+// list one step at a time (or dragging it past many screens of cards) isn't
+// practical. This does it in a single action regardless of distance.
+// targetSectionId is either '__top__' (move above the first section, i.e.
+// "no section") or the id of the section item to file the question under.
+function moveQuestionToSection(qid,targetSectionId){
+  const fi=items.findIndex(it=>it.id===qid);
+  if(fi===-1)return;
+  const q=items[fi];
+  if(q.kind!=='question')return;
+  const currentSectionId=_currentSectionIdForItem(qid);
+  if(String(currentSectionId)===String(targetSectionId))return; // no-op, already there
+
+  pushHistory('Move to section');
+  items.splice(fi,1);
+
+  let insertAt;
+  if(targetSectionId==='__top__'){
+    insertAt=0;
+  }else{
+    const si=items.findIndex(it=>it.id===targetSectionId&&it.kind==='section');
+    if(si===-1){
+      // Target section vanished (e.g. deleted in another tab / race condition)
+      // — put the question back where it was rather than silently dropping it.
+      items.splice(fi,0,q);
+      renderBuilder();
+      return;
+    }
+    insertAt=si+1;
+    while(insertAt<items.length&&items[insertAt].kind!=='section')insertAt++;
+  }
+  items.splice(insertAt,0,q);
+  jumpToItemPage(qid);renderBuilder();triggerAutoSave();
+  showShortcutToast(targetSectionId==='__top__'?'Moved above all sections':'Moved to section');
+}
+
 // Builds the "Move up" / "Move down" button pair used by both question and
 // section cards as the keyboard-operable alternative to drag-and-drop.
 // `label` (e.g. "question", "section") makes the announced accessible name
@@ -8931,18 +9344,31 @@ function _insertDragGap(refCard,insertBefore){
   else{refCard.after(gap);}
 }
 function initCardDragDrop(){
+  // This runs on every bindBuilderEvents() call — including every additional
+  // virtual-scroll batch and every jumpToItemPage() append — which re-visits
+  // ALL currently-rendered cards, not just newly-appended ones. Without
+  // remove-before-add (same pattern bindBuilderEvents() already uses for its
+  // input fields via el._h), a card left in the DOM across two of those
+  // calls would accumulate a second full set of drag/drop listeners.
   document.querySelectorAll('#questions-list [data-itemid]').forEach(card=>{
-    card.addEventListener('dragstart',e=>{
+    if(card._dragStartH)card.removeEventListener('dragstart',card._dragStartH);
+    card._dragStartH=e=>{
       dragSrcId=parseInt(card.dataset.itemid);
       card.classList.add('dragging-card');
       e.dataTransfer.effectAllowed='move';
-    });
-    card.addEventListener('dragend',()=>{
+    };
+    card.addEventListener('dragstart',card._dragStartH);
+
+    if(card._dragEndH)card.removeEventListener('dragend',card._dragEndH);
+    card._dragEndH=()=>{
       card.classList.remove('dragging-card');
       document.querySelectorAll('.drag-over-card').forEach(c=>c.classList.remove('drag-over-card'));
       _removeDragGap();
-    });
-    card.addEventListener('dragover',e=>{
+    };
+    card.addEventListener('dragend',card._dragEndH);
+
+    if(card._dragOverH)card.removeEventListener('dragover',card._dragOverH);
+    card._dragOverH=e=>{
       e.preventDefault();
       const tid=parseInt(card.dataset.itemid);
       if(tid===dragSrcId)return;
@@ -8952,13 +9378,19 @@ function initCardDragDrop(){
       const insertBefore=e.clientY<midY;
       _insertDragGap(card,insertBefore);
       card._dragInsertBefore=insertBefore;
-    });
-    card.addEventListener('dragleave',e=>{
+    };
+    card.addEventListener('dragover',card._dragOverH);
+
+    if(card._dragLeaveH)card.removeEventListener('dragleave',card._dragLeaveH);
+    card._dragLeaveH=e=>{
       if(!card.contains(e.relatedTarget)){
         card.classList.remove('drag-over-card');
       }
-    });
-    card.addEventListener('drop',e=>{
+    };
+    card.addEventListener('dragleave',card._dragLeaveH);
+
+    if(card._dropH)card.removeEventListener('drop',card._dropH);
+    card._dropH=e=>{
       e.preventDefault();
       card.classList.remove('drag-over-card');
       _removeDragGap();
@@ -8973,7 +9405,8 @@ function initCardDragDrop(){
       const insertBefore=card._dragInsertBefore;
       items.splice(insertBefore?ti:ti+1,0,m);
       jumpToItemPage(dragSrcId);renderBuilder();triggerAutoSave();
-    });
+    };
+    card.addEventListener('drop',card._dropH);
   });
 }
 
@@ -9632,6 +10065,10 @@ function setDragAnsFromSelect(qid,slotId,itemId){
   renderPreview();
 }
 
+// Tracks the single active Escape-key listener from initDragDropPreviews()
+// below, so repeated calls (it runs on every renderPreview()) don't keep
+// stacking up new document-level 'keydown' listeners forever.
+let _dragDropEscHandler=null;
 function initDragDropPreviews(){
   // ── Mouse / touch drag-and-drop ──────────────────────────────────────────
   document.querySelectorAll('.p-drag-item').forEach(el=>{
@@ -9721,10 +10158,15 @@ function initDragDropPreviews(){
     });
   });
 
-  // Escape clears any pending keyboard selection
-  document.addEventListener('keydown',e=>{
+  // Escape clears any pending keyboard selection.
+  // Remove the previous call's listener first — this function runs on every
+  // renderPreview(), so without this, each render left another listener
+  // permanently attached to document (see _dragDropEscHandler above).
+  if(_dragDropEscHandler)document.removeEventListener('keydown',_dragDropEscHandler);
+  _dragDropEscHandler=e=>{
     if(e.key==='Escape'&&_kbPendingItem){_clearKbSelection();}
-  },{passive:true});
+  };
+  document.addEventListener('keydown',_dragDropEscHandler,{passive:true});
 }
 
 function bindPreviewInputEvents(){
@@ -10238,7 +10680,11 @@ function parseTextImport(raw){
   return questions;
 }
 
-function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Single canonical HTML/XML-escaping function — covers & < > " ' — used
+// everywhere either the old escHtml() (HTML-only, 4 entities) or the old
+// local escX() (XLSX XML cell content, 5 entities incl. apostrophe) were
+// previously used. See downloadXlsx() below for the former escX call sites.
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
 function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 // ── Spoiler-style hints in translation source sentences ─────────────────────
@@ -10539,7 +10985,9 @@ async function exportAnswerDetailToExcel(){
 }
 
 function downloadXlsx(filename,sheets){
-  const escX=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  // escX(): removed — was a duplicate of escHtml() (same 5-entity escaping).
+  // All call sites below already pass non-null strings, so escHtml() is a
+  // drop-in replacement (see the null-coalescing in `raw` above each call).
   const isNum=v=>typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(v.replace('%','')));
   const cellRef=(r,c)=>{let col='';let n=c+1;while(n>0){col=String.fromCharCode(65+(n-1)%26)+col;n=Math.floor((n-1)/26);}return col+(r+1);};
 
@@ -10551,9 +10999,9 @@ function downloadXlsx(filename,sheets){
         const ref=cellRef(ri,ci);
         const raw=String(val==null?'':val);
         const numVal=raw.replace('%','');
-        if(ri===0)return`<c r="${ref}" s="1" t="inlineStr"><is><t>${escX(raw)}</t></is></c>`;
-        if(!isNaN(numVal)&&numVal!==''&&!raw.includes('/')&&!raw.includes(':')&&!raw.includes('-'))return`<c r="${ref}"><v>${escX(numVal)}</v></c>`;
-        return`<c r="${ref}" t="inlineStr"><is><t>${escX(raw)}</t></is></c>`;
+        if(ri===0)return`<c r="${ref}" s="1" t="inlineStr"><is><t>${escHtml(raw)}</t></is></c>`;
+        if(!isNaN(numVal)&&numVal!==''&&!raw.includes('/')&&!raw.includes(':')&&!raw.includes('-'))return`<c r="${ref}"><v>${escHtml(numVal)}</v></c>`;
+        return`<c r="${ref}" t="inlineStr"><is><t>${escHtml(raw)}</t></is></c>`;
       }).join('');
       return`<row r="${ri+1}">${cells}</row>`;
     }).join('');
@@ -10563,7 +11011,7 @@ function downloadXlsx(filename,sheets){
   const stylesXml=`<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts><font><sz val="10"/></font><font><b/><sz val="10"/></font></fonts><fills><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/></fgColor></fill></fills><borders><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>`;
 
   const wbRels=sheetNames.map((n,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('');
-  const wbXml=`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetNames.map((n,i)=>`<sheet name="${escX(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`;
+  const wbXml=`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetNames.map((n,i)=>`<sheet name="${escHtml(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`;
 
   const files={
     '[Content_Types].xml':`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheetNames.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
@@ -10670,6 +11118,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(window.innerWidth<900)document.getElementById('toc-panel').classList.remove('toc-panel--open');
     });
   });
+  // Keep the persistent section breadcrumb (see _updateSectionBreadcrumb) in sync
+  // while scrolling/resizing. Both handlers are cheap no-ops whenever the builder
+  // questions tab isn't visible, so this is safe to leave registered globally.
+  window.addEventListener('scroll',_scheduleSectionBreadcrumbUpdate,{passive:true});
+  window.addEventListener('resize',_scheduleSectionBreadcrumbUpdate,{passive:true});
 });
 
 // §SHORTCUTS ──────────────────────────────────────────────────────────────────
@@ -11547,13 +12000,26 @@ document.addEventListener('touchstart',e=>{
 },{passive:true});
 
 // §TESTS ──────────────────────────────────────────────────────────────────────
-// Inline scoring unit tests — run automatically on every page load.
-// Results are silent on pass; failures print to the browser console.
-//
-// TODO: Move this block to a separate tests.js and load it conditionally:
-//   if (location.hostname === 'localhost') { /* load tests.js */ }
-// That way tests never run in production and the IIFE below can be deleted.
-(function runScoringTests(){
+// Scoring unit tests — kept inline (single-file deploy again), but gated so
+// they only RUN for debug/dev contexts, never for regular end users:
+//   • ?debug=1 query param on the page URL, or
+//   • hostname is localhost / 127.0.0.1, or
+//   • NODE_ENV is set to a non-production value (dev tooling / SSR previews)
+(function _runTestsIfDebug(){
+  let isDebug = false;
+  try {
+    const params = new URLSearchParams(location.search);
+    isDebug = params.get('debug') === '1' ||
+      location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1';
+  } catch (e) { /* URLSearchParams/location unavailable — not a browser tab */ }
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV && process.env.NODE_ENV !== 'production') {
+      isDebug = true;
+    }
+  } catch (e) { /* process undefined in the browser — expected, ignore */ }
+  if (!isDebug) return;
+
   let passed=0,failed=0;
   function assert(desc,actual,expected){
     if(actual===expected){passed++;return;}
