@@ -2738,6 +2738,355 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 }
 .type-select:hover,.move-section-select:hover{border-color:var(--purple-mid)}
 
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 1 — WORKSPACE SHELL REDESIGN
+   Adds a persistent left rail (brand / primary action / Dashboard / Drive
+   status) and turns the topbar into a slim, mostly-neutral contextual bar
+   scoped to whatever is open in the main pane. Nothing below removes or
+   renames any id/class the app depends on — it only repositions and
+   restyles. Purple is now reserved for the sidebar mark, the primary
+   action, the active nav item, and focus/selection — everywhere else
+   goes neutral, per the "reduce purple" direction.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --sidebar-w:236px;
+  --statusbar-h:34px;
+}
+
+/* ── Shell grid: sidebar + main column ── */
+.app{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh;align-items:start}
+.shell-main{display:flex;flex-direction:column;min-height:100vh;min-width:0}
+
+/* ── Sidebar ── */
+.sidebar{
+  background:var(--surface);border-right:1px solid var(--border-light);
+  display:flex;flex-direction:column;gap:2px;
+  padding:var(--sp-4) var(--sp-3) var(--sp-4);
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.sidebar-brand{display:flex;align-items:center;gap:9px;padding:4px var(--sp-2) var(--sp-6)}
+.sidebar-brand-mark{width:26px;height:26px;flex-shrink:0;background:var(--purple);border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-xs)}
+.sidebar-brand-mark svg{width:15px;height:15px}
+.sidebar-brand-text{display:flex;flex-direction:column;line-height:1.15}
+.sidebar-brand-name{font-size:13.5px;font-weight:650;color:var(--text);letter-spacing:-.01em}
+.sidebar-brand-sub{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.4px;text-transform:uppercase}
+
+.sidebar-cta{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--purple);color:#fff;border:none;border-radius:var(--r-md);
+  padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;
+  margin:0 var(--sp-1) var(--sp-5);transition:background .15s var(--ease),transform .15s var(--ease),box-shadow .15s var(--ease);
+  box-shadow:var(--shadow-xs);font-family:inherit;
+}
+.sidebar-cta:hover{background:var(--purple-700);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.sidebar-cta svg{width:14px;height:14px;flex-shrink:0}
+
+.sidebar-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.6px;text-transform:uppercase;padding:0 var(--sp-2);margin:var(--sp-3) 0 6px}
+.sidebar-nav{display:flex;flex-direction:column;gap:1px}
+.sidebar-nav-item{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:7px var(--sp-2);border-radius:8px;border:none;background:transparent;
+  font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;font-family:inherit;
+  transition:background .12s var(--ease),color .12s var(--ease);
+}
+.sidebar-nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.8}
+.sidebar-nav-item:hover{background:var(--surface3);color:var(--text)}
+.sidebar-nav-item.active{background:var(--purple-dim);color:var(--purple-700);font-weight:600}
+.sidebar-nav-item.active svg{opacity:1}
+.sidebar-nav-item[disabled]{opacity:.42;cursor:default;pointer-events:none}
+
+.sidebar-footer{margin-top:auto;padding-top:var(--sp-3);border-top:1px solid var(--border-light);display:flex;flex-direction:column;gap:6px}
+/* The Drive-status pill is a real, functional element (see #topbar-drive-pill
+   in the markup below) — it's physically relocated here, not duplicated.
+   Its internal ids/classes/onclick are untouched, only its position + skin. */
+.sidebar-footer .topbar-drive-pill{
+  width:100%;justify-content:flex-start;color:var(--text2);
+  background:var(--surface3);border:1px solid var(--border-light);border-radius:var(--r-md);
+  padding:8px 10px;
+}
+.sidebar-footer .topbar-drive-pill:hover{background:var(--surface2);border-color:var(--border)}
+.sidebar-footer .topbar-drive-pill-sub{color:var(--text3)}
+
+/* ── Topbar: from full-bleed purple chrome to a slim neutral contextual bar ── */
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--border-light);
+  box-shadow:none;padding:0 var(--sp-5);
+}
+.topbar-logo{display:none} /* brand now lives in the sidebar */
+.topbar-subtitle{color:var(--text3)}
+.topbar-title{color:var(--text)}
+.role-badge-admin{background:var(--purple-dim);color:var(--purple-700)}
+.role-badge-viewer{background:var(--amber-bg);color:var(--amber)}
+.tab-btn{color:var(--text3)}
+.tab-btn.active{color:var(--purple-700);border-bottom-color:var(--purple)}
+.tab-btn:hover:not(.active){color:var(--text);background:var(--surface3)}
+.btn-attempts{background:var(--surface3);color:var(--text2);border:1px solid var(--border)}
+.btn-attempts:hover{background:var(--surface2);border-color:var(--border-strong)}
+.hamburger-btn{background:var(--surface3);border:1.5px solid var(--border);color:var(--text2)}
+.hamburger-btn:hover{background:var(--surface2);border-color:var(--border-strong)}
+.hamburger-btn.menu-open{background:var(--purple-dim);border-color:var(--purple-mid);color:var(--purple-700)}
+.btn-ur{color:var(--text3)}
+.btn-ur:not(:disabled):hover{color:var(--purple-700);background:var(--purple-dim)}
+.autosave-badge{color:var(--text3)}
+.btn-undo-redo{border-right:1px solid var(--border-light)}
+
+/* ── Dashboard: bigger hero, unified toolbar, quieter cards ── */
+#dashboard-view{max-width:1180px}
+.dash-heading{font-weight:700;font-size:var(--fs-3xl);letter-spacing:-.025em}
+.dash-heading span{color:var(--purple)}
+.dash-subtitle{color:var(--text3);font-size:var(--fs-base);margin-top:2px}
+.dash-header{margin-bottom:var(--sp-6);align-items:flex-end}
+
+/* Search + sort read as one calm toolbar instead of two stacked rows */
+.dash-search-wrap{
+  order:1;background:var(--surface);border:1px solid var(--border-light);
+  border-radius:var(--r-lg);padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-3);
+  box-shadow:var(--shadow-xs);
+}
+.dash-search-input{border:none;background:transparent;font-size:14px;padding:6px 30px 6px 30px}
+.dash-search-input:focus{box-shadow:none}
+.sort-bar{order:2;padding-bottom:var(--sp-2);border-bottom:1px solid var(--border-light);margin-bottom:var(--sp-5)}
+.sort-btn{border-color:transparent;background:transparent}
+.sort-btn:hover{border-color:var(--border-light)}
+
+.form-card{border-radius:var(--r-lg);box-shadow:none;border-color:var(--border-light)}
+.form-card:hover{box-shadow:var(--shadow-md);border-color:var(--border-strong);transform:translateY(-2px)}
+.form-card-stripe{height:3px}
+.dash-empty{border-style:solid;background:linear-gradient(180deg,var(--surface),var(--surface2));box-shadow:var(--shadow-xs)}
+
+/* Collapse the sidebar into a slide-out drawer below tablet width, and let
+   the mobile hamburger open it via the existing mobile-menu machinery —
+   no new JS required, this only changes what's visible at each width. */
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 2 — QUESTION BUILDER CANVAS: PROGRESSIVE DISCLOSURE
+   The canvas now shows only question text + type + answer/options by
+   default. Required, Points, "Move to section", and Tags are per-question
+   *settings* rather than content, so they move into a collapsible panel
+   under each card (collapsed by default, opened via the new "⚙ Settings"
+   button in the footer). Duplicate / Insert-section-here / Delete stay
+   always-visible as quick one-shot actions, not properties to review.
+   Nothing here renames an id, removes a listener, or changes any function
+   body — renderQCardNode() just parents the same elements under a new
+   wrapper, and toggleQSettings() only flips a CSS class + in-memory Set.
+   ═══════════════════════════════════════════════════════════════════════ */
+.q-card-body{padding-bottom:var(--sp-2)}
+.q-footer{background:var(--surface)}
+.q-settings-toggle{margin-right:auto;color:var(--text3)}
+.q-settings-toggle::after{
+  content:'';display:inline-block;width:0;height:0;margin-left:3px;
+  border-left:4px solid transparent;border-right:4px solid transparent;
+  border-top:5px solid currentColor;transition:transform .15s var(--ease);
+}
+.q-settings-toggle.open{color:var(--purple-700);background:var(--purple-dim)}
+.q-settings-toggle.open::after{transform:rotate(180deg)}
+
+.q-settings-panel{display:none}
+.q-settings-panel.open{
+  display:flex;flex-direction:column;gap:var(--sp-3);align-items:flex-start;
+  padding:var(--sp-4) var(--sp-5);background:var(--surface2);
+  border-top:1px solid var(--border-light);
+  animation:slideUp .16s var(--ease);
+}
+.q-settings-panel .move-section-select-wrap{margin-right:0;width:100%}
+.q-settings-panel .req-toggle{margin-right:0}
+.q-settings-panel .points-row{margin-top:0}
+.q-settings-panel .q-tags-row{padding:0;width:100%}
+
+@media (max-width:600px){
+  .q-settings-panel{padding:var(--sp-3) var(--sp-4)}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 2, ITEM 4 — QUESTION CARD CHROME
+   1) Drag handle: swapped the plain "⋮⋮" text glyph for a proper SVG grip
+      (dragHandle now gets its markup via innerHTML in renderQCardNode
+      instead of textContent — same element, same class, same drag wiring).
+   2) Type icon: a small glyph next to the type <select> so a long list of
+      cards reads at a glance without opening every dropdown. The <select>
+      itself is untouched — still the real control read by updateType().
+   3) Section grouping: question cards under a section get a data-in-section
+      attribute (from _currentSectionIdForItem(), already existed) that
+      drives a subtle indent + background tint here. No new nesting in the
+      DOM/data model — items[] stays flat, virtual-scroll rendering is
+      unaffected.
+   ═══════════════════════════════════════════════════════════════════════ */
+.drag-handle{
+  display:flex;align-items:center;justify-content:center;
+  width:16px;height:22px;top:9px;border-radius:4px;
+  transition:color .12s var(--ease),background .12s var(--ease);
+}
+.drag-handle:hover{background:var(--surface2)}
+.drag-handle svg{pointer-events:none}
+
+.type-select-wrap{display:flex;align-items:center;gap:6px}
+.q-type-icon{
+  display:flex;align-items:center;justify-content:center;
+  width:22px;height:22px;flex-shrink:0;border-radius:var(--r-sm);
+  color:var(--purple);background:var(--purple-dim);
+}
+@media (max-width:600px){
+  .type-select-wrap{flex:1 1 100%;width:100%}
+  .type-select-wrap .type-select{flex:1;min-width:0}
+}
+
+.q-card[data-in-section="1"]{
+  margin-left:var(--sp-4);
+  background:var(--purple-50);
+}
+.q-card[data-in-section="1"] .q-footer{background:var(--purple-50)}
+.q-card[data-in-section="1"].selected{background:var(--surface)}
+@media (max-width:600px){
+  .q-card[data-in-section="1"]{margin-left:var(--sp-2)}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 3, ITEM 1 (cont.) — QUESTION BANK MODAL
+   Same ids/classes renderBankTagFilters()/renderBankList()/updateBankFooter()
+   already target — no DOM/JS changes, just: a search icon inset into the
+   existing input, a selection checkmark on .bank-item.selected (CSS-only,
+   via ::after), and an icon on the empty state.
+   ═══════════════════════════════════════════════════════════════════════ */
+.bank-search{
+  padding-left:32px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23918da8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:10px center;background-size:14px 14px;
+}
+.bank-item{padding-right:38px}
+.bank-item.selected{box-shadow:0 2px 10px rgba(92,53,177,.12)}
+.bank-item.selected::after{
+  content:'';position:absolute;top:12px;right:12px;width:18px;height:18px;
+  border-radius:50%;background:var(--purple);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:center;background-size:11px 11px;
+}
+.bank-empty::before{content:'🔍';display:block;font-size:26px;margin-bottom:8px;opacity:.45}
+
+/* ── Import Questions modal: icons on the three static tab buttons +
+   a slightly friendlier file-drop state. Ids/onclick on the tabs are
+   untouched — icons only. ── */
+.modal-tab{display:inline-flex;align-items:center;gap:6px}
+.modal-tab svg{width:13px;height:13px;opacity:.75}
+.modal-tab.active svg{opacity:1}
+.file-drop:hover .file-drop-icon,.file-drop.drag-over .file-drop-icon{transform:scale(1.08)}
+.file-drop-icon{transition:transform .15s var(--ease);display:inline-block}
+
+/* ── Attempt History rows: match the elevation language used by other
+   cards (--shadow-sm) instead of a border-color-only hover state. ── */
+.attempt-row:hover{box-shadow:var(--shadow-sm)}
+
+</style>
+<style id="phase3-overrides">
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 3 — MODALS + MOBILE
+   1) Sidebar becomes a real slide-in drawer under 900px instead of just
+      vanishing — reuses the exact same open/close calls the hamburger
+      already had (openMobileMenu/closeMobileMenu in the script below now
+      also toggle .sidebar.mobile-open). No new nav items, no new state
+      machine: same trigger, same Escape/outside-click-to-close.
+   2) Consistent modal header/body/footer spacing using the Phase 1 tokens.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width:900px){
+  .sidebar{
+    display:flex; /* overrides the earlier display:none for this breakpoint */
+    position:fixed;top:0;left:0;height:100vh;
+    width:min(78vw,280px);
+    z-index:150;
+    transform:translateX(-100%);
+    transition:transform .22s var(--ease);
+    box-shadow:var(--shadow-xl);
+  }
+  .sidebar.mobile-open{transform:translateX(0)}
+}
+/* Dim the (otherwise transparent) outside-click catcher only while the
+   sidebar drawer is open, so it reads as a real drawer + backdrop rather
+   than a floating panel. Falls back to no dimming on browsers without
+   :has() support — outside-click-to-close still works either way. */
+body:has(.sidebar.mobile-open) .mobile-overlay{background:rgba(17,10,40,.35)}
+
+/* ── Modal header/body/footer: consistent spacing across Share, Bank,
+   Import, and Attempt History/Detail modals (all use these same classes) ── */
+.modal-header{padding:var(--sp-4) var(--sp-5);gap:var(--sp-2)}
+.modal-title{gap:8px}
+.modal-body{padding:var(--sp-5)}
+.modal-footer{padding:var(--sp-4) var(--sp-5);gap:var(--sp-2)}
+@media (max-width:600px){
+  .modal-header{padding:var(--sp-3) var(--sp-4)}
+  .modal-body{padding:var(--sp-4)}
+  .modal-footer{padding:var(--sp-3) var(--sp-4)}
+}
+
+/* ── Share modal: content-layer redesign, not just spacing ──
+   Same classes/ids openShareModal() already renders into (share-section,
+   share-section-title, share-link-row, share-action-row, btn-share,
+   share-import-zone…) — this just gives them stronger hierarchy: the
+   "live link" section reads as the primary action, section icons become
+   badges instead of bare glyphs, and action rows get card affordance. */
+.share-section-title svg{
+  width:15px;height:15px;padding:5px;box-sizing:content-box;
+  background:var(--purple-dim);border-radius:var(--r-sm);
+}
+.share-section:first-child{
+  background:var(--purple-50);margin:var(--sp-3) var(--sp-3) 0;
+  border-radius:var(--r-lg);border-bottom:none;padding:var(--sp-4) var(--sp-5);
+}
+.share-section:first-child + .share-section{margin-top:var(--sp-1)}
+.share-link-row input{background:var(--surface);border-color:var(--border-strong)}
+.share-action-row{
+  padding:var(--sp-2) var(--sp-2);border-radius:var(--r-md);
+  transition:background .12s var(--ease);margin-left:calc(var(--sp-2) * -1);margin-right:calc(var(--sp-2) * -1);
+  width:calc(100% + var(--sp-4));
+}
+.share-action-row:hover{background:var(--surface2)}
+.share-import-zone{border-radius:var(--r-lg)}
+@media (max-width:600px){
+  .share-section:first-child{margin:var(--sp-2) var(--sp-2) 0;padding:var(--sp-3) var(--sp-4)}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 3, ITEM 3 — BOTTOM STATUS STRIP
+   A thin strip pinned to the viewport bottom while the Questions tab of
+   the builder is open. It doesn't introduce any new state or counting
+   logic — it just mirrors values that already exist:
+     - save status: same saving/saved states triggerAutoSave() already
+       puts on #autosave-dot, now also written to #strip-save-dot/text.
+     - question count / total points: same numbers updateStats() already
+       writes to #stat-q-count/#stat-pts, now also mirrored here.
+     - last-edited: reads the same f.updatedAt saveCurrentForm() already
+       sets on the form record.
+   Visibility: shown by default (matches #questions-tab's own default
+   visible state), hidden by switchTab()'s existing tab-toggle when the
+   Preview tab is active (identical ternary pattern to the tab panes
+   themselves), and hidden under 900px via plain CSS since the mobile
+   drawer/cramped canvas has no room for it. It's inside #builder-view,
+   so it's already removed from render whenever that's display:none
+   (i.e. back on the dashboard) with no extra JS needed. It also carries
+   the existing .admin-only class so viewers/test users — who don't see
+   the autosave badge either — don't see it.
+   ═══════════════════════════════════════════════════════════════════════ */
+.builder-status-strip{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  height:var(--statusbar-h);
+  display:flex;align-items:center;gap:10px;
+  padding:0 var(--sp-5);
+  background:var(--surface);border-top:1px solid var(--border-light);
+  box-shadow:0 -2px 10px rgba(0,0,0,.05);
+  font-size:12px;color:var(--text3);
+  margin-left:var(--sidebar-w);
+}
+.builder-status-strip strong{color:var(--text2);font-weight:600}
+.status-strip-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.status-strip-sep{opacity:.4}
+.status-strip-dot{width:6px;height:6px;border-radius:50%;background:var(--border-strong);transition:background .3s}
+.status-strip-dot.saving{background:#ffca28;animation:pulse-dot .7s infinite alternate}
+.status-strip-dot.saved{background:#37b26c}
+@media (max-width:900px){
+  .builder-status-strip{display:none!important}
+}
 </style>
 <!--
   PRINT HARDENING (fixes "Failed to load PDF document" when using
@@ -2848,6 +3197,41 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 })();
 </script>
 <div class="app">
+  <aside class="sidebar" id="app-sidebar" aria-label="Workspace navigation">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-mark">
+        <svg viewBox="0 0 24 24" fill="#fff"><rect x="3" y="3" width="18" height="18" rx="2.5" fill="rgba(255,255,255,.2)"/><rect x="6" y="7" width="12" height="2" rx="1" fill="#fff"/><rect x="6" y="11" width="12" height="2" rx="1" fill="#fff"/><rect x="6" y="15" width="8" height="2" rx="1" fill="#fff"/></svg>
+      </div>
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-sub">Quiz Builder</span>
+        <span class="sidebar-brand-name">My Workspace</span>
+      </div>
+    </div>
+    <button type="button" class="sidebar-cta" onclick="createNewForm()" aria-label="Create a new form or quiz">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New Form
+    </button>
+    <nav class="sidebar-nav" aria-label="Views">
+      <button type="button" class="sidebar-nav-item active" onclick="if(typeof saveAndGoBack==='function')saveAndGoBack();" title="All your forms and quizzes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <!-- Drive sync status — relocated here from the topbar. Same element,
+           same id/onclick/classes the Drive module (§DRIVE) reads and
+           toggles; only its position and skin changed. -->
+      <button type="button" class="topbar-drive-pill" id="topbar-drive-pill" onclick="openLibModal('drive')" title="Drive: Off" aria-label="Google Drive sync status: not connected. Click for details.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="topbar-drive-pill-icon" aria-hidden="true"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span class="topbar-drive-dot" id="topbar-drive-dot" aria-hidden="true"></span>
+        <span class="topbar-drive-pill-text">
+          <span id="topbar-drive-pill-main">Drive: Off</span>
+          <span class="topbar-drive-pill-sub" id="topbar-drive-pill-sub"></span>
+        </span>
+      </button>
+    </div>
+  </aside>
+  <div class="shell-main" id="shell-main">
   <div class="topbar" id="topbar">
     <div class="topbar-left">
       <div class="topbar-logo">
@@ -2858,14 +3242,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
         <span class="topbar-title" id="topbar-form-title">My Forms</span>
       </div>
       <span class="role-badge" id="role-badge" style="display:none"></span>
-      <button type="button" class="topbar-drive-pill" id="topbar-drive-pill" onclick="openLibModal('drive')" title="Drive: Off" aria-label="Google Drive sync status: not connected. Click for details.">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="topbar-drive-pill-icon" aria-hidden="true"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-        <span class="topbar-drive-dot" id="topbar-drive-dot" aria-hidden="true"></span>
-        <span class="topbar-drive-pill-text">
-          <span id="topbar-drive-pill-main">Drive: Off</span>
-          <span class="topbar-drive-pill-sub" id="topbar-drive-pill-sub"></span>
-        </span>
-      </button>
     </div>
     <div class="topbar-tabs" id="topbar-tabs" style="display:none">
       <button class="tab-btn active admin-only" id="tab-questions" onclick="switchTab('questions')">Questions</button>
@@ -3270,14 +3646,30 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
     <div id="preview-tab" style="display:none">
       <div class="preview-wrap" id="preview-content"></div>
     </div>
+    <div id="builder-status-strip" class="builder-status-strip admin-only">
+      <span class="status-strip-item" id="strip-save-status">
+        <span class="status-strip-dot" id="strip-save-dot"></span>
+        <span id="strip-save-text">Saved</span>
+      </span>
+      <span class="status-strip-sep">·</span>
+      <span class="status-strip-item"><strong id="strip-q-count">0</strong> questions</span>
+      <span class="status-strip-sep">·</span>
+      <span class="status-strip-item"><strong id="strip-pts">0</strong> pts</span>
+      <span class="status-strip-sep">·</span>
+      <span class="status-strip-item" id="strip-last-edited">Not yet saved</span>
+    </div>
   </div>
+  </div><!-- /.shell-main -->
 </div>
 
 <!-- ══ Export / Import Library Modal ════════════════════════════════════════ -->
 <span id="anchor-lib-modal" class="toc-anchor"></span>
-<div class="modal-overlay" id="lib-modal" style="display:none" onclick="handleLibModalOverlay(event)">
+<div class="modal-overlay" id="lib-modal" style="display:none" onclick="handleLibModalOverlay(event)" role="dialog" aria-modal="true" aria-labelledby="lib-modal-title">
   <div class="modal lib-modal">
     <div class="modal-header modal-header--purple">
+      <span class="modal-title" id="lib-modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="modal-title-icon" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Data &amp; Backup
       </span>
       <button class="modal-close" onclick="closeLibModal()" aria-label="Close library modal">×</button>
     </div>
@@ -3417,9 +3809,9 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
     </div>
     <div class="modal-body">
       <div class="modal-tabs">
-        <button class="modal-tab active" id="mtab-text" onclick="switchModalTab('text')">Paste Text</button>
-        <button class="modal-tab" id="mtab-json" onclick="switchModalTab('json')">JSON</button>
-        <button class="modal-tab" id="mtab-file" onclick="switchModalTab('file')">Upload File</button>
+        <button class="modal-tab active" id="mtab-text" onclick="switchModalTab('text')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>Paste Text</button>
+        <button class="modal-tab" id="mtab-json" onclick="switchModalTab('json')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3a2 2 0 00-2 2v3a2 2 0 01-2 2 2 2 0 012 2v3a2 2 0 002 2"/><path d="M16 3a2 2 0 012 2v3a2 2 0 002 2 2 2 0 00-2 2v3a2 2 0 01-2 2"/></svg>JSON</button>
+        <button class="modal-tab" id="mtab-file" onclick="switchModalTab('file')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload File</button>
       </div>
       <div id="import-text-panel">
         <textarea class="import-textarea" id="import-text-input" placeholder="Q: What is 2+2?&#10;A) 3  B) 4  C) 5  D) 6&#10;Correct: B&#10;&#10;Q: The sky is blue. (True/False)&#10;Correct: True&#10;&#10;Q: Translate: Hello!&#10;Answer: ¡Hola!&#10;&#10;1. What is your name?&#10;2. Describe your day."></textarea>
@@ -3464,10 +3856,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
 
 <!-- ══ Attempt History Modal ═════════════════════════════════════════════════ -->
 <span id="anchor-attempts-modal" class="toc-anchor"></span>
-<div class="modal-overlay" id="attempts-modal" style="display:none" onclick="handleAttemptsOverlayClick(event)">
+<div class="modal-overlay" id="attempts-modal" style="display:none" onclick="handleAttemptsOverlayClick(event)" role="dialog" aria-modal="true" aria-labelledby="attempts-modal-title">
   <div class="modal attempts-modal">
     <div class="modal-header modal-header--purple">
-      <span class="modal-title">
+      <span class="modal-title" id="attempts-modal-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="modal-title-icon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         My Attempt History
       </span>
@@ -3477,7 +3869,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
   </div>
 </div>
 
-<div class="modal-overlay" id="attempt-detail-modal" style="display:none" onclick="handleAttemptDetailOverlayClick(event)">
+<div class="modal-overlay" id="attempt-detail-modal" style="display:none" onclick="handleAttemptDetailOverlayClick(event)" role="dialog" aria-modal="true" aria-labelledby="attempt-detail-title">
   <div class="modal attempts-modal attempt-detail-modal">
     <div class="modal-header modal-header--purple">
       <span class="modal-title">
@@ -5814,6 +6206,11 @@ function initDB(){
 function triggerAutoSave(){
   const dot=document.getElementById('autosave-dot');
   if(dot)dot.className='autosave-dot saving';
+  // Phase 3, item 3: same saving state, also reflected on the status strip.
+  const stripDot=document.getElementById('strip-save-dot');
+  const stripText=document.getElementById('strip-save-text');
+  if(stripDot)stripDot.className='status-strip-dot saving';
+  if(stripText)stripText.textContent='Saving…';
   clearTimeout(autoSaveTimer);
   setState({autoSaveTimer:setTimeout(()=>{
     saveCurrentForm();
@@ -5822,6 +6219,9 @@ function triggerAutoSave(){
     persistFormById();
     persistQuestions();
     if(dot)dot.className='autosave-dot saved';
+    if(stripDot)stripDot.className='status-strip-dot saved';
+    if(stripText)stripText.textContent='Saved';
+    updateStats(); // refreshes strip-last-edited from the updatedAt saveCurrentForm() just set
     setTimeout(()=>{if(dot)dot.className='autosave-dot';},2000);
   },800)});
 }
@@ -5987,6 +6387,11 @@ function openMobileMenu(){
   _mobileMenuOpen=true;
   document.getElementById('mobile-menu').classList.add('open');
   document.getElementById('mobile-overlay').classList.add('open');
+  // Phase 3: the sidebar collapses to a drawer under 900px (see the
+  // .sidebar media-query rules) — reuse this same open/close machinery to
+  // slide it in/out instead of it just being hidden with no way back in.
+  const sb=document.getElementById('app-sidebar');
+  if(sb)sb.classList.add('mobile-open');
   const hb=document.getElementById('hamburger-btn');
   if(hb){hb.classList.add('menu-open');hb.setAttribute('aria-expanded','true');}
   updateMobileMenu();
@@ -5998,6 +6403,8 @@ function closeMobileMenu(){
   _mobileMenuOpen=false;
   document.getElementById('mobile-menu').classList.remove('open');
   document.getElementById('mobile-overlay').classList.remove('open');
+  const sb=document.getElementById('app-sidebar');
+  if(sb)sb.classList.remove('mobile-open');
   const hb=document.getElementById('hamburger-btn');
   if(hb){
     hb.classList.remove('menu-open');
@@ -6009,6 +6416,16 @@ function closeMobileMenu(){
 function _mobileMenuKeydown(e){
   if(e.key==='Escape'){e.preventDefault();closeMobileMenu();}
 }
+// Phase 3: closing the drawer after a nav action is a UX nicety on top of
+// the machinery above, not new business logic — it only calls the existing
+// closeMobileMenu(), it doesn't touch any button's own onclick attribute.
+(function _wireSidebarDrawerAutoClose(){
+  const sb=document.getElementById('app-sidebar');
+  if(!sb)return;
+  sb.addEventListener('click',()=>{
+    if(sb.classList.contains('mobile-open'))closeMobileMenu();
+  });
+})();
 function updateMobileMenu(){
   const inBuilder=!!currentFormId;
   document.getElementById('mobile-tabs-section').style.display=inBuilder?'block':'none';
@@ -8056,6 +8473,10 @@ function switchTab(tab){
   const wasOnPreview = document.getElementById('preview-tab').style.display==='block';
   document.getElementById('questions-tab').style.display=tab==='questions'?'block':'none';
   document.getElementById('preview-tab').style.display=tab==='preview'?'block':'none';
+  // Phase 3, item 3: same tab-toggle pattern — status strip only makes sense
+  // while actively editing, not in Preview.
+  const statusStrip=document.getElementById('builder-status-strip');
+  if(statusStrip) statusStrip.style.display=tab==='questions'?'flex':'none';
   document.getElementById('tab-questions').classList.toggle('active',tab==='questions');
   document.getElementById('tab-preview').classList.toggle('active',tab==='preview');
   // Always hide the FAB when switching tabs; updateStats() will re-show it for the questions tab
@@ -8552,6 +8973,18 @@ function updateStats(){
   if(qEl)qEl.textContent=STATE.questionCount;
   if(sEl)sEl.textContent=STATE.sectionCount;
   if(pEl)pEl.textContent=pts;
+  // Phase 3, item 3: mirror the same numbers into the bottom status strip.
+  const stripQEl=document.getElementById('strip-q-count');
+  const stripPEl=document.getElementById('strip-pts');
+  if(stripQEl)stripQEl.textContent=STATE.questionCount;
+  if(stripPEl)stripPEl.textContent=pts;
+  const stripLastEdited=document.getElementById('strip-last-edited');
+  if(stripLastEdited){
+    const f=currentFormId&&forms.find(x=>x.id===currentFormId);
+    stripLastEdited.textContent=(f&&f.updatedAt)
+      ?'Edited '+new Date(f.updatedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+      :'Not yet saved';
+  }
   // Show floating FAB only when in the builder (questions tab) with 5+ items
   const fab=document.getElementById('fab-goto-last');
   const isQuestionsTabActive=document.getElementById('questions-tab')&&document.getElementById('questions-tab').style.display!=='none';
@@ -9350,14 +9783,63 @@ const QUESTION_TYPES = {
 // renderQCardNode / renderSectionCardNode return detached DOM nodes that
 // renderBuilder appends to the virtual-scroll list.
 // Also contains the card drag-and-drop reorder implementation.
+// Phase 2 — progressive disclosure state for the question builder canvas.
+// Tracks which question cards have their settings panel expanded. This is
+// deliberately NOT part of STATE/persistence: it's transient UI chrome only,
+// resets on reload, and mirrors the in-memory pattern used elsewhere in this
+// file (e.g. _mobileMenuOpen, _folderViewMode) rather than adding a new
+// storage key.
+let _qSettingsOpenIds=new Set();
+function toggleQSettings(id){
+  const panel=document.getElementById('qsettings-'+id);
+  const btn=document.querySelector(`#qcard-${id} .q-settings-toggle`);
+  const open=!_qSettingsOpenIds.has(id);
+  if(open)_qSettingsOpenIds.add(id);else _qSettingsOpenIds.delete(id);
+  if(panel)panel.classList.toggle('open',open);
+  if(btn){btn.classList.toggle('open',open);btn.setAttribute('aria-expanded',String(open));}
+}
+
+// Phase 2, item 4 — small per-type glyphs shown next to the type <select>.
+// Purely decorative/supplementary: the <select> remains the actual control
+// (updateType() still reads its value on 'change'); this just gives a
+// glance-able icon so a long question list doesn't require reading every
+// dropdown label to see what kind of question each card is. Static, trusted
+// SVG markup only (same pattern as the existing moveSecIcon below), never
+// built from user-supplied strings.
+const _TYPE_ICON_PATHS={
+  radio:'<circle cx="7" cy="7" r="5.4" stroke="currentColor" fill="none" stroke-width="1.3"/><circle cx="7" cy="7" r="2.1" fill="currentColor"/>',
+  checkbox:'<rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" fill="none" stroke-width="1.3"/><path d="M4.5 7.2l2 2 3-4.2" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  dropdown:'<rect x="1.5" y="3" width="11" height="8" rx="1.5" stroke="currentColor" fill="none" stroke-width="1.2"/><path d="M5 6.3l2 2 2-2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  truefalse:'<path d="M1.8 4.6l1.8 1.8 2.6-3.6" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 9.2l4 4M13 9.2l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  translation:'<path d="M1.3 4h6M5 1.5L7.6 4 5 6.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.7 10h-6M9 7.5L6.4 10 9 12.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  dragdrop:'<circle cx="3.2" cy="4" r="1" fill="currentColor"/><circle cx="3.2" cy="7" r="1" fill="currentColor"/><circle cx="3.2" cy="10" r="1" fill="currentColor"/><path d="M7.5 7h5.2M10.7 4.3L13.2 7l-2.5 2.7" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  matching:'<circle cx="2.4" cy="3.4" r="1.25" stroke="currentColor" fill="none" stroke-width="1.1"/><circle cx="2.4" cy="10.6" r="1.25" stroke="currentColor" fill="none" stroke-width="1.1"/><circle cx="11.6" cy="3.4" r="1.25" stroke="currentColor" fill="none" stroke-width="1.1"/><circle cx="11.6" cy="10.6" r="1.25" stroke="currentColor" fill="none" stroke-width="1.1"/><path d="M3.6 4L10.4 10M3.6 10L10.4 4" stroke="currentColor" stroke-width="1" opacity=".55"/>',
+  short:'<path d="M1.8 9.8h10.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1.8 6.3h7.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>',
+  long:'<path d="M1.8 3.8h10.4M1.8 7h10.4M1.8 10.2h6.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  date:'<rect x="2" y="3" width="10" height="9" rx="1.5" stroke="currentColor" fill="none" stroke-width="1.2"/><path d="M2 6h10" stroke="currentColor" stroke-width="1.1"/><path d="M4.5 1.6v2.4M9.5 1.6v2.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
+};
+function _makeTypeIconSvg(type){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 14 14');svg.setAttribute('width','14');svg.setAttribute('height','14');svg.setAttribute('aria-hidden','true');
+  svg.innerHTML=_TYPE_ICON_PATHS[type]||_TYPE_ICON_PATHS.short;
+  return svg;
+}
+
 function renderQCardNode(q,i){
   const sel=selectedId===q.id;
   const wrap=document.createElement('div');
   wrap.className='q-card'+(sel?' selected':'');wrap.id='qcard-'+q.id;
   wrap.draggable=true;wrap.dataset.itemid=q.id;
   wrap.addEventListener('click',()=>selectItem(q.id));
+  // Phase 2, item 4 — visual grouping cue: tag cards that belong under a
+  // section with a data attribute so CSS can give them a subtle left
+  // indent/tint. Purely presentational — items[] stays a flat array, this
+  // just reuses the existing _currentSectionIdForItem() lookup.
+  const _secIdForTint=_currentSectionIdForItem(q.id);
+  if(_secIdForTint!=='__top__')wrap.dataset.inSection='1';
 
-  const dragHandle=document.createElement('div');dragHandle.className='drag-handle';dragHandle.title='Drag to reorder';dragHandle.textContent='⋮⋮';
+  const dragHandle=document.createElement('div');dragHandle.className='drag-handle';dragHandle.title='Drag to reorder';dragHandle.setAttribute('aria-label','Drag to reorder');
+  dragHandle.innerHTML='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="2.5" cy="8" r="1.4" fill="currentColor"/><circle cx="7.5" cy="8" r="1.4" fill="currentColor"/><circle cx="2.5" cy="13.5" r="1.4" fill="currentColor"/><circle cx="7.5" cy="13.5" r="1.4" fill="currentColor"/></svg>';
   const moveBtns=_makeMoveButtons(q.id,'question');
 
   const cardBody=document.createElement('div');cardBody.className='q-card-body';
@@ -9381,8 +9863,17 @@ function renderQCardNode(q,i){
   labelWrap.append(labelInp,qNum);
   const typeSelect=document.createElement('select');typeSelect.className='type-select';
   TYPES.forEach(t=>{const o=document.createElement('option');o.value=t.val;o.textContent=t.label;if(q.type===t.val)o.selected=true;typeSelect.appendChild(o);});
-  typeSelect.addEventListener('change',e=>{e.stopPropagation();updateType(q.id,e.target.value);});
-  qTop.append(labelWrap,typeSelect);
+  typeSelect.addEventListener('change',e=>{e.stopPropagation();updateType(q.id,e.target.value);
+    const iconHost=typeSelect.parentElement?typeSelect.parentElement.querySelector('.q-type-icon'):null;
+    if(iconHost){iconHost.innerHTML='';iconHost.appendChild(_makeTypeIconSvg(e.target.value));}
+  });
+  // Phase 2, item 4 — small icon reflects the current type at a glance;
+  // the <select> is untouched and stays the functional control.
+  const typeSelectWrap=document.createElement('div');typeSelectWrap.className='type-select-wrap';
+  const typeIconHost=document.createElement('span');typeIconHost.className='q-type-icon';typeIconHost.setAttribute('aria-hidden','true');
+  typeIconHost.appendChild(_makeTypeIconSvg(q.type));
+  typeSelectWrap.append(typeIconHost,typeSelect);
+  qTop.append(labelWrap,typeSelectWrap);
 
   const innerFrag=document.createDocumentFragment();
   const typeHandler=QUESTION_TYPES[q.type];
@@ -9393,7 +9884,7 @@ function renderQCardNode(q,i){
   const ptsInp=_makeInput('points-input',{type:'number',min:'0',value:String(q.points||0)},{qid:q.id});
   ptsRow.append(ptsLabel,ptsInp);
 
-  cardBody.append(qTop,...Array.from(innerFrag.childNodes),ptsRow);
+  cardBody.append(qTop,...Array.from(innerFrag.childNodes));
 
   const footer=document.createElement('div');footer.className='q-footer';
   const reqLabel=document.createElement('label');reqLabel.className='req-toggle';reqLabel.textContent='Required';
@@ -9459,7 +9950,22 @@ function renderQCardNode(q,i){
   });
   moveSecWrap.append(moveSecIcon,moveSecSelect);
 
-  footer.append(moveSecWrap,reqLabel,dupBtn,insSectionBtn,delBtn);
+  // Phase 2: Required, Points, "Move to section", and Tags are per-question
+  // *settings* rather than canvas content, so they collapse into a panel
+  // under the card (collapsed by default) instead of always-on chrome.
+  // Duplicate/Insert-section/Delete stay as always-visible quick actions
+  // since they're one-shot actions, not properties to review/edit.
+  const settingsToggle=_makeBtn('q-icon-btn q-settings-toggle','⚙ Settings',()=>toggleQSettings(q.id));
+  settingsToggle.setAttribute('aria-controls','qsettings-'+q.id);
+  settingsToggle.setAttribute('aria-expanded',String(_qSettingsOpenIds.has(q.id)));
+  if(_qSettingsOpenIds.has(q.id))settingsToggle.classList.add('open');
+
+  footer.append(settingsToggle,dupBtn,insSectionBtn,delBtn);
+
+  const settingsPanel=document.createElement('div');
+  settingsPanel.className='q-settings-panel'+(_qSettingsOpenIds.has(q.id)?' open':'');
+  settingsPanel.id='qsettings-'+q.id;
+  settingsPanel.append(moveSecWrap,reqLabel,ptsRow,tagsRow);
 
   // Touch drag polyfill — pointer events work on mobile where HTML5 drag events don't
   (function attachTouchDrag(handle, card) {
@@ -9509,7 +10015,7 @@ function renderQCardNode(q,i){
     });
   }(dragHandle, wrap));
 
-  wrap.append(dragHandle,moveBtns,cardBody,footer,tagsRow);
+  wrap.append(dragHandle,moveBtns,cardBody,footer,settingsPanel);
   return wrap;
 }
 
@@ -12200,10 +12706,26 @@ function isTypingFocus(){
 // §ACCESSIBILITY ──────────────────────────────────────────────────────────────
 // Focus trap (WCAG 2.1 §2.4.3) — constrains Tab/Shift+Tab to focusable elements
 // inside the active modal. Restores focus to the trigger element on close.
-// Applied to: Bank modal, Share modal, Attempts modal, Import modal, Lib modal.
+// Applied to: Bank, Share, Attempts, Attempt detail, Import, Lib modals.
 let _focusTrapEl=null;
 let _focusTrapPrevEl=null;
 const FOCUS_SELECTORS='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+// Phase 3 — maps a modal's id to its own close function, so ESC can close
+// *whichever* modal currently holds the focus trap. Previously only
+// share-modal/bank-modal were wired to Escape explicitly; attempts-modal,
+// attempt-detail-modal, import-modal, and lib-modal opened with a focus trap
+// (via patchExistingModals below) but Escape silently did nothing inside
+// them. This registry doesn't change what share/bank already did — it just
+// stops hardcoding two ids and instead looks up whichever modal is active.
+const _MODAL_ESC_CLOSERS={
+  'share-modal':()=>closeShareModal(),
+  'bank-modal':()=>closeBankModal(),
+  'attempts-modal':()=>closeAttemptsModal(),
+  'attempt-detail-modal':()=>closeAttemptDetailModal(),
+  'import-modal':()=>closeImportModal(),
+  'lib-modal':()=>closeLibModal(),
+};
 
 function _trapFocus(modal){
   _focusTrapPrevEl=document.activeElement;
@@ -12231,8 +12753,6 @@ function _handleTrapKeydown(e){
 }
 function _handleTrapEscape(e){
   if(e.key!=='Escape'){return;}
-  const shareModal=document.getElementById('share-modal');
-  const bankModal=document.getElementById('bank-modal');
   const confirmOverlay=document.getElementById('_confirm-modal-overlay');
   const alertOverlay=document.getElementById('_alert-modal-overlay');
   // Dynamic overlays — simulate a click on the overlay backdrop to trigger their finish() handlers.
@@ -12243,13 +12763,15 @@ function _handleTrapEscape(e){
     if(cancelBtn){cancelBtn.click();}else{confirmOverlay.click();}
     e.stopPropagation();return;
   }
-  if(shareModal&&shareModal.style.display!=='none'){closeShareModal();e.stopPropagation();return;}
-  if(bankModal&&bankModal.style.display!=='none'){closeBankModal();e.stopPropagation();return;}
+  const modal=_focusTrapEl;
+  const closer=modal&&modal.style.display!=='none'?_MODAL_ESC_CLOSERS[modal.id]:null;
+  if(closer){closer();e.stopPropagation();return;}
 }
 
 (function patchExistingModals(){
   const patches=[
     {id:'attempts-modal',open:'openAttemptsModal',close:'closeAttemptsModal'},
+    {id:'attempt-detail-modal',open:'openAttemptDetailModal',close:'closeAttemptDetailModal'},
     {id:'import-modal',open:'openImportModal',close:'closeImportModal'},
     {id:'lib-modal',open:'openLibModal',close:'closeLibModal'},
   ];
