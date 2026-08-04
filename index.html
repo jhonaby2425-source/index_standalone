@@ -3097,6 +3097,77 @@ body:has(.sidebar.mobile-open) .mobile-overlay{background:rgba(17,10,40,.35)}
 }
 </style>
 <!--
+  THEME SWITCHER — lets the person flip between the "Ink & Signal" (coral)
+  redesign and the original indigo/violet look, live, no reload. Implemented
+  as a single opt-in class on <body> (.theme-classic) rather than two files:
+  - Most of the visual difference is just custom-property values (--purple,
+    --surface2, --text, etc.), and CSS custom properties inherit, so
+    redeclaring them on body.theme-classic recolors everything that already
+    reads var(--purple) etc. throughout the whole stylesheet for free.
+  - The handful of *structural* changes (topbar chrome, button shape/radius,
+    the question-number badge, card spacing) aren't var-driven, so those get
+    explicit body.theme-classic-scoped rules below, using the exact original
+    property values (diffed against the pre-redesign file) so "classic" is a
+    pixel-accurate revert, not an approximation.
+  Toggled by toggleAppTheme() (see app.js), persisted in localStorage under
+  'qb_theme' (same mechanism the app already uses for its own data), applied
+  on load by the inline snippet at the top of <body> before first paint.
+-->
+<style id="theme-classic-toggle">
+body.theme-classic{
+  --purple:#5b3df0;--purple-light:#7c65f5;--purple-dim:#f1eefe;--purple-mid:#a48cf7;
+  --purple-700:#4527c9;--purple-50:#f6f4ff;
+  --green:#15803d;--green-bg:#ecfdf3;--green-border:#a7e2bb;
+  --surface2:#f8f7fc;--surface3:#f1eff9;
+  --border:#e7e3f3;--border-light:#efecf9;--border-strong:#d8d2ec;
+  --text:#161225;--text2:#5c5773;--text3:#918da8;
+  --topbar-h:56px;
+  --form-accent:#5b3df0;
+  --shadow-focus:0 0 0 3px rgba(91,61,240,.22);
+}
+body.theme-classic{background-image:none}
+body.theme-classic .topbar{background:var(--surface);border-bottom:1px solid var(--border-light);box-shadow:none;padding:0 var(--sp-5)}
+body.theme-classic .topbar-logo{display:none}
+body.theme-classic .topbar-subtitle{color:var(--text3)}
+body.theme-classic .topbar-title{color:var(--text)}
+body.theme-classic .tab-btn{color:var(--text3)}
+body.theme-classic .tab-btn.active{color:var(--purple-700);border-bottom-color:var(--purple)}
+body.theme-classic .tab-btn:hover:not(.active){color:var(--text);background:var(--surface3)}
+body.theme-classic .btn-outline{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:var(--r-sm);font-weight:500;padding:7px 14px}
+body.theme-classic .btn-white{background:#fff;color:var(--purple);border-radius:var(--r-sm);font-weight:600;padding:7px 16px;box-shadow:var(--shadow-xs)}
+body.theme-classic .btn-white:hover{background:var(--purple-50);box-shadow:var(--shadow-sm)}
+body.theme-classic .back-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-sm);padding:7px 14px}
+body.theme-classic .back-btn:hover{background:rgba(255,255,255,.2)}
+body.theme-classic .btn-attempts{background:var(--surface3);color:var(--text2);border:1px solid var(--border);border-radius:var(--r-sm)}
+body.theme-classic .btn-attempts:hover{background:var(--surface2);border-color:var(--border-strong)}
+body.theme-classic .hamburger-btn{background:var(--surface3);border:1.5px solid var(--border);color:var(--text2)}
+body.theme-classic .hamburger-btn:hover{background:var(--surface2);border-color:var(--border-strong)}
+body.theme-classic .hamburger-btn.menu-open{background:var(--purple-dim);border-color:var(--purple-mid);color:var(--purple-700)}
+body.theme-classic .btn-ur{color:var(--text3)}
+body.theme-classic .btn-ur:not(:disabled):hover{color:var(--purple-700);background:var(--purple-dim)}
+body.theme-classic .autosave-badge{color:var(--text3)}
+body.theme-classic .btn-undo-redo{border-right:1px solid var(--border-light)}
+body.theme-classic .btn-new-form{border-radius:var(--r-md);padding:11px 20px;font-weight:600;box-shadow:var(--shadow-sm)}
+body.theme-classic .btn-new-form:hover{box-shadow:var(--shadow-md)}
+body.theme-classic .builder-wrap{gap:10px}
+body.theme-classic .q-card{border-radius:var(--r-lg);border-left:3px solid transparent;box-shadow:var(--shadow-xs)}
+body.theme-classic .q-card:hover{box-shadow:var(--shadow-xs);transform:none}
+body.theme-classic .q-card.selected{box-shadow:var(--shadow-sm)}
+body.theme-classic .q-label-input:focus{background:rgba(91,61,240,.02)}
+body.theme-classic .opt-input:focus{background:rgba(91,61,240,.015)}
+body.theme-classic .q-num{order:0;flex-shrink:1;min-width:0;height:auto;padding:0;margin-top:3px;border-radius:0;background:transparent;color:var(--text3);font-size:10px;font-weight:500;display:block;box-shadow:none}
+body.theme-classic .js-label-wrap{display:block}
+body.theme-classic .js-label-wrap .q-label-input{width:100%}
+/* Toggle control itself, lives in the sidebar footer next to the Drive pill */
+.theme-toggle-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--surface3);border:1px solid var(--border);border-radius:var(--r-md);
+  color:var(--text2);font-size:11px;font-weight:600;padding:8px 10px;cursor:pointer;
+  transition:all .15s var(--ease);margin-top:6px;
+}
+.theme-toggle-btn:hover{background:var(--surface2);border-color:var(--border-strong)}
+</style>
+<!--
   PRINT HARDENING (fixes "Failed to load PDF document" when using
   Print / Save as PDF):
   The app's fixed-position chrome (topbar, mobile menu, TOC panel, FAB,
@@ -3136,6 +3207,14 @@ body:has(.sidebar.mobile-open) .mobile-overlay{background:rgba(17,10,40,.35)}
 </style>
 </head>
 <body>
+<script>
+// Apply the saved theme choice before first paint so switching templates
+// doesn't flash the other one on load. Same localStorage mechanism the app
+// already uses for its own data (see toggleAppTheme() in app.js below).
+try{
+  if(localStorage.getItem('qb_theme')==='classic'){document.body.classList.add('theme-classic');}
+}catch(e){}
+</script>
 <script>
 // ── MOBILE DIAGNOSTIC OVERLAY ───────────────────────────────────────────────
 // Purpose: on phones there's usually no easy way to see console errors, so
@@ -3236,6 +3315,13 @@ body:has(.sidebar.mobile-open) .mobile-overlay{background:rgba(17,10,40,.35)}
           <span id="topbar-drive-pill-main">Drive: Off</span>
           <span class="topbar-drive-pill-sub" id="topbar-drive-pill-sub"></span>
         </span>
+      </button>
+      <!-- Theme switcher — flips body.theme-classic on/off; see the
+           theme-classic-toggle <style> block and toggleAppTheme() in app.js.
+           Label text is set on load/click so it always names the *other*
+           theme (the thing clicking it will switch you to). -->
+      <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleAppTheme()">
+        <span aria-hidden="true">🎨</span><span id="theme-toggle-label">Classic look</span>
       </button>
     </div>
   </aside>
@@ -5118,6 +5204,24 @@ async function _updateRoleFromEmail(){
   _isAdmin = ADMIN_EMAILS.length===0 || ADMIN_EMAILS.includes(await _sha256Hex(_driveAccountEmail));
   _applyRoleToUI();
 }
+
+// ── THEME SWITCHER ──────────────────────────────────────────────────────
+// Flips between the "Ink & Signal" (coral) redesign and the original
+// indigo/violet look. Everything visual lives in CSS (the
+// theme-classic-toggle <style> block); this just toggles the class,
+// persists the choice, and keeps the button's label naming whichever
+// theme clicking it would switch *to*.
+function _updateThemeToggleLabel(){
+  const label=document.getElementById('theme-toggle-label');
+  if(!label)return;
+  label.textContent = document.body.classList.contains('theme-classic') ? 'New look' : 'Classic look';
+}
+function toggleAppTheme(){
+  const isClassic = document.body.classList.toggle('theme-classic');
+  try{localStorage.setItem('qb_theme', isClassic ? 'classic' : 'new');}catch(e){}
+  _updateThemeToggleLabel();
+}
+document.addEventListener('DOMContentLoaded', _updateThemeToggleLabel);
 
 // Toggles the .role-viewer class on <body>, which a single CSS rule
 // (`.admin-only`) uses to hide every editing control app-wide, updates the
