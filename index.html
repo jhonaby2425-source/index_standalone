@@ -11508,10 +11508,17 @@ function doImport(){
     }
     else{const raw=document.getElementById('import-text-input').value.trim();if(!raw){showError('import-text-error','Please paste some questions.');return;}imported=parseTextImport(raw);}
     if(!imported.length){showError('import-'+(activeModalTab==='text'?'text':activeModalTab)+'-error','No questions found.');return;}
+    // Flag (without blocking) any multiple-choice question the parser
+    // couldn't fully make sense of, so a malformed paste doesn't silently
+    // produce a broken question the author has no reason to suspect.
+    const shakyCount=imported.filter(q=>q.type==='radio'&&(!q.options||q.options.length<2)).length;
     pushHistory('Import '+imported.length+' question'+(imported.length!==1?'s':''));
     imported.forEach(q=>{q.id=_allocId();q.kind='question';items.push(q);});
     _recomputeItemCounters(); // keep questionCount in sync after bulk import
     closeImportModal();renderBuilder();triggerAutoSave();
+    if(shakyCount>0){
+      showShortcutToast(shakyCount+' imported question'+(shakyCount!==1?'s':'')+' had unrecognized answer choices — please review before publishing.');
+    }
   }catch(err){showError('import-'+(activeModalTab==='text'?'text':activeModalTab)+'-error','Parse error: '+err.message);}
 }
 /**
@@ -11596,11 +11603,51 @@ function parseJsonImport(raw){
     return{label,type,required:!!obj.required,points:Math.floor(pts),correct:obj.correct||'',...extra};
   });
 }
+// Splits a chunk of text containing one or more `A) ... B) ... C) ... D) ...`
+// markers into an ordered options array. Handles both formats the Paste Text
+// tab is documented (via the textarea placeholder / hint) to accept:
+//   - all options on one line:      "A) 3  B) 4  C) 5  D) 6"
+//   - one option per line:          "A) 3\nB) 4\nC) 5\nD) 6"
+// Callers join multi-line option blocks with a space before calling this, so
+// both shapes reduce to the same "A) 3 B) 4 C) 5 D) 6" string here.
+function _parseOptionsBlock(str){
+  const markerRe=/(^|\s)([A-D])[).]\s*/g;
+  const marks=[];let m;
+  while((m=markerRe.exec(str))){
+    marks.push({markerStart:m.index+(m[1]?1:0),valueStart:markerRe.lastIndex});
+  }
+  if(!marks.length)return[];
+  const options=[];
+  for(let k=0;k<marks.length;k++){
+    const end=k+1<marks.length?marks[k+1].markerStart:str.length;
+    options.push(str.slice(marks[k].valueStart,end).trim());
+  }
+  return options;
+}
 function parseTextImport(raw){
   const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);const questions=[];let i=0;
   while(i<lines.length){const line=lines[i];
     if(/^Q:/i.test(line)){const label=line.replace(/^Q:/i,'').trim();const q={label,type:'short',required:false,points:0,correct:''};
-      if(i+1<lines.length&&/^[A-D][).]/.test(lines[i+1])){q.type='radio';q.options=[];while(i+1<lines.length&&/^[A-D][).]/.test(lines[i+1])){i++;q.options.push(lines[i].replace(/^[A-D][).]\s*/,'').trim());}if(i+1<lines.length&&/^correct:/i.test(lines[i+1])){i++;const key=lines[i].replace(/^correct:/i,'').trim().toUpperCase();const idx='ABCD'.indexOf(key);if(idx>=0&&q.options[idx])q.correct=q.options[idx];}}
+      if(i+1<lines.length&&/^[A-D][).]/.test(lines[i+1])){
+        q.type='radio';
+        // Gather every consecutive option line (works whether all options
+        // share one line or each sits on its own line) then parse as a block.
+        let block='';
+        while(i+1<lines.length&&/^[A-D][).]/.test(lines[i+1])){i++;block+=(block?' ':'')+lines[i];}
+        q.options=_parseOptionsBlock(block);
+        if(i+1<lines.length&&/^correct:/i.test(lines[i+1])){
+          i++;
+          const ansRaw=lines[i].replace(/^correct:/i,'').trim();
+          const idx='ABCD'.indexOf(ansRaw.toUpperCase());
+          if(idx>=0&&q.options[idx]){q.correct=q.options[idx];}
+          else{
+            // Author may have typed the full answer text instead of a letter
+            // (e.g. "Correct: Paris") — match it against the parsed options.
+            const match=q.options.find(o=>o.toLowerCase()===ansRaw.toLowerCase());
+            if(match)q.correct=match;
+          }
+        }
+      }
       else if(/\(true\/false\)/i.test(label)){q.type='truefalse';q.label=label.replace(/\(true\/false\)/i,'').trim();if(i+1<lines.length&&/^correct:/i.test(lines[i+1])){i++;q.correctTF=lines[i].replace(/^correct:/i,'').trim().toLowerCase()==='true';}}
       else if(i+1<lines.length&&/^(answer|translate):/i.test(lines[i+1])){i++;q.type='translation';q.sourceText=label;q.acceptableAnswers=[lines[i].replace(/^(answer|translate):/i,'').trim()];}
       questions.push(q);
