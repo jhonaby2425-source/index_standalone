@@ -19,11 +19,12 @@
 <!--
   CSP NOTE (security):
   'unsafe-inline' is kept in script-src because ~60 inline onclick= attributes
-  throughout this file depend on it. The standalone <script> block that previously
-  lived here has been moved to app.js (see toggleTOC / DOMContentLoaded there),
-  eliminating the biggest risk. To fully remove 'unsafe-inline':
+  throughout this file depend on it, and all application logic (referred to
+  in comments below as "app.js" for module-naming purposes only) is embedded
+  in <script> blocks in this same document rather than loaded from a separate
+  file. To fully remove 'unsafe-inline':
     - Replace all onclick/oninput/onchange/ondragXxx attributes with
-      addEventListener() calls in app.js (search "onclick=" in this file).
+      addEventListener() calls (search "onclick=" in this file).
     - Then drop 'unsafe-inline' from the script-src directive below.
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self';">
@@ -3259,7 +3260,7 @@ try{
         // document.body may not exist yet this early — fall back to documentElement.
         (document.body || document.documentElement).appendChild(box);
       }
-      var msgEl = document.getElementById('__diagOverlayMsg');
+      msgEl = document.getElementById('__diagOverlayMsg');
       var entry = document.createElement('div');
       entry.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.3)';
       entry.textContent = '⚠ ' + title + (detail ? '\n' + detail : '');
@@ -5183,6 +5184,58 @@ let _driveViewerAttemptsSyncTimer=null;
 let _driveViewerAttemptsPushInFlight=false;
 let _driveViewerAttemptsPushQueuedAgain=false;
 
+// §REVOKE-RECHECK ────────────────────────────────────────────────────────────
+// AUDIT FIX (see CLAUDE_CONTINUATION_PROMPT §1): revocation used to only be
+// checked at connect-time (driveConnect/_shareGateSignIn/driveTryAutoReconnect,
+// all of which funnel through _driveFindOrCreateFileAndHydrate below) and on
+// a manual "Refresh from Drive" click. A test user who was already connected
+// and mid-session when an admin revoked them would keep full access for the
+// rest of that browser session — nothing ever re-checked _revokedEmails again
+// until they happened to disconnect/reconnect. That silently broke the
+// "hard-blocked … the next time their client re-checks" promise in the
+// §REVOKE comment above (which named this exact function). This timer is
+// what makes that promise true: while a non-admin is connected against a
+// DRIVE_SHARED_FILE_ID library, poll the shared file's `revokedEmails` list
+// on an interval and show the revoked gate the moment a match appears,
+// without requiring any user action.
+const DRIVE_REVOCATION_RECHECK_MS = 5*60*1000; // 5 minutes
+let _driveRevocationRecheckTimer=null;
+function _driveStopRevocationRecheck(){
+  if(_driveRevocationRecheckTimer){clearInterval(_driveRevocationRecheckTimer);_driveRevocationRecheckTimer=null;}
+}
+function _driveStartRevocationRecheck(){
+  _driveStopRevocationRecheck();
+  // Only meaningful for a connected, non-admin, shared-library session —
+  // admins are never revoked (they're not on the revoked list by
+  // definition: see ADMIN_EMAILS), and there's nothing to poll without a
+  // shared file id.
+  if(_isAdmin||!DRIVE_SHARED_FILE_ID||!_driveConnected)return;
+  _driveRevocationRecheckTimer=setInterval(_driveRecheckRevocation,DRIVE_REVOCATION_RECHECK_MS);
+}
+// Lightweight poll: re-downloads just the shared library file (same call the
+// rest of Drive sync already uses) and checks this account's hash against
+// the freshest revokedEmails list. Deliberately does NOT call
+// _driveHydrateFromPayload here — this is a background safety check, not a
+// sync tick, so it shouldn't also silently overwrite in-progress local
+// state on every 5-minute poll. If the account is fine, only _revokedEmails
+// itself is refreshed (harmless, and keeps the next check accurate).
+async function _driveRecheckRevocation(){
+  if(_isAdmin||!DRIVE_SHARED_FILE_ID||!_driveConnected||!_driveAccountEmail)return;
+  try{
+    const payload=await _driveDownloadFile(DRIVE_SHARED_FILE_ID);
+    if(Array.isArray(payload&&payload.revokedEmails))_revokedEmails=payload.revokedEmails;
+    if(await _isEmailRevoked(_driveAccountEmail)){
+      _driveStopRevocationRecheck();
+      _showAccessRevokedGate();
+    }
+  }catch(e){
+    // Network hiccup, expired token, etc. — fail open on THIS poll (don't
+    // lock someone out over a transient fetch error) and just try again on
+    // the next tick rather than tearing down the timer.
+    console.warn('[drive] revocation recheck failed (will retry next interval):',e);
+  }
+}
+
 // Fail-safe default: if ADMIN_EMAILS is configured, nobody is treated as
 // admin until we've actually verified a signed-in email against that list.
 // If ADMIN_EMAILS is left empty, role-checking is off and everyone is admin
@@ -5218,6 +5271,7 @@ async function _isEmailRevoked(email){
   return _revokedEmails.includes(hash);
 }
 function _showAccessRevokedGate(){
+  _driveStopRevocationRecheck();
   document.querySelectorAll('.app,#dashboard-view,#share-gate-view').forEach(el=>{ if(el) el.style.display='none'; });
   const gate=document.getElementById('access-revoked-view');
   if(gate) gate.classList.add('show');
@@ -5600,6 +5654,13 @@ function _driveRenderModalUI(){
           without needing a redeploy. This does <strong>not</strong> detect or react to someone
           copying the app's code — see the note above <code>ADMIN_EMAILS</code> in the source for
           why that isn't something client-side code can reliably do.
+          ${_getRevokedEmailsPlaintextCache().length!==_revokedEmails.length ? `<div class="drive-role-note drive-role-note-viewer" style="margin-top:6px">
+            ⚠️ This browser's remembered email list (${_getRevokedEmailsPlaintextCache().length}) doesn't match
+            the count currently synced to Drive (${_revokedEmails.length}) — the list below was probably last
+            edited from a <strong>different device/browser</strong>, so it may be missing emails someone else
+            revoked. Click "Refresh from Drive" above first if you're not sure, otherwise "Save &amp; push"
+            below will <strong>overwrite</strong> the synced list with only what's shown here.
+          </div>` : ''}
           <textarea id="drive-revoke-emails" rows="3" style="width:100%;margin-top:6px;font-family:'DM Mono',monospace;font-size:11.5px;border:1px solid var(--border-light);border-radius:6px;padding:6px 8px;resize:vertical" placeholder="someone@example.com">${_escHtml(_getRevokedEmailsPlaintextCache().join('\n'))}</textarea>
           <button class="fc-action" style="padding:3px 10px;margin-top:6px" onclick="_driveSaveRevokedEmails()">Save &amp; push to Drive</button>
         </div>` : ''));
@@ -5769,6 +5830,7 @@ function driveDisconnect(){
   try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
   clearTimeout(_driveSyncTimer);
   clearTimeout(_driveViewerAttemptsSyncTimer);
+  _driveStopRevocationRecheck();
   _driveHideReconnectBanner();
   _driveSetStatus('','Disconnected. Your data stays safe in this browser (IndexedDB) but will no longer sync to Drive.');
   _driveRenderModalUI();
@@ -5792,6 +5854,7 @@ function driveSwitchAccount(){
   try{localStorage.removeItem(DRIVE_TOKEN_LS_KEY);}catch(_){}
   clearTimeout(_driveSyncTimer);
   clearTimeout(_driveViewerAttemptsSyncTimer);
+  _driveStopRevocationRecheck();
   _driveRenderModalUI();
   driveConnect();
 }
@@ -5950,6 +6013,12 @@ async function _driveFindOrCreateFileAndHydrate(){
       try{ await _driveFindOrCreateViewerAttemptsFileAndHydrate(); }
       catch(e){ console.warn('[drive] viewer attempts backup init failed:',e); }
     }
+    // AUDIT FIX (§REVOKE-RECHECK above): start/refresh the periodic
+    // revocation poll now that this account's role + connection are settled.
+    // Every caller of this function (driveConnect, driveTryAutoReconnect,
+    // _shareGateSignIn, _shareGateBoot) funnels through here, so hooking it
+    // in this one place covers all of them.
+    _driveStartRevocationRecheck();
     return;
   }
   const existing=await _driveFindFile();
@@ -6273,6 +6342,42 @@ function migrateFromLocalStorage(){
 // High-level save/load helpers that sit above the raw DB primitives.
 // Rule of thumb: always use persistFormById() for single-form writes;
 // only fall back to persistForms() (full flush) for bulk import operations.
+
+// ── Persistence-failure surfacing (Round 3, item 1) ──────────────────────────
+// Historically every write here was fire-and-forget: dbPutOne(...).catch(e=>
+// console.warn(...)). If the write failed (quota exceeded, private-browsing
+// restrictions, storage eviction under memory pressure), STATE/items in
+// memory already reflected the change as saved, and the only trace was an
+// invisible console.warn — a page refresh after such a failure silently
+// rolled back to the last successfully-persisted version.
+//
+// _persistWithRetry wraps a DB-write call with:
+//   1. one retry, since the most common recoverable failure is a transient
+//      IndexedDB lock held by another tab, which usually clears in a beat;
+//   2. a user-visible toast on final failure via the app's existing
+//      showShortcutToast() pattern — deliberately not a blocking modal,
+//      since a modal on every failed autosave would be far more disruptive
+//      to a quiz-taking/editing flow than the risk it guards against.
+// High-frequency, low-stakes callers (e.g. preview-draft autosave on every
+// keystroke) pass {silent:true} to keep the retry-then-log behavior without
+// popping a toast on every tick — see call sites for the reasoning in each
+// case. Failures still console.warn exactly as before for devtools
+// visibility, and the returned promise still rejects on final failure so
+// `await`-ing callers can react (e.g. reset a stuck "Saving…" button).
+function _persistWithRetry(writeFn, opts){
+  opts = opts || {};
+  const label = opts.label || 'save';
+  const failMsg = opts.failMsg || 'Could not save — your last change may not have been kept. Try again?';
+  const silent = !!opts.silent;
+  return writeFn().catch(e=>{
+    console.warn(label+' — write failed, retrying once:', e);
+    return writeFn().catch(e2=>{
+      console.warn(label+' — failed after retry:', e2);
+      if(!silent) showShortcutToast(failMsg);
+      throw e2;
+    });
+  });
+}
 /**
  * Persist a single form record to IndexedDB using dbPutOne.
  * Pass an explicit id, or omit to flush whichever form STATE._dirtyFormId points at.
@@ -6286,7 +6391,7 @@ function persistFormById(id){
   const record = forms.find(x => x.id === targetId);
   if(!record){ setState({_dirtyFormId:null}); return; } // already deleted
   setState({_dirtyFormId:null});
-  dbPutOne(STORE_FORMS, record).catch(e => console.warn('persistFormById:', e));
+  _persistWithRetry(()=>dbPutOne(STORE_FORMS, record), {label:'persistFormById'});
 }
 
 /**
@@ -6300,7 +6405,7 @@ function markFormDirty(id){
 
 /** @deprecated — full flush; use persistFormById() for targeted single-record writes. */
 function persistForms(){
-  dbPutAll(STORE_FORMS,forms).catch(e=>console.warn('persistForms (full flush):',e));
+  _persistWithRetry(()=>dbPutAll(STORE_FORMS,forms), {label:'persistForms (full flush)'});
 }
 /**
  * Full clear-and-rewrite of the attempts store.
@@ -6309,14 +6414,14 @@ function persistForms(){
  * records that were not loaded into the current session's memory.
  */
 function persistAttempts(){
-  dbPutAll(STORE_ATTEMPTS,attempts).catch(e=>console.warn('persistAttempts:',e));
+  _persistWithRetry(()=>dbPutAll(STORE_ATTEMPTS,attempts), {label:'persistAttempts'});
 }
 function persistQuestions(){
   if(!currentFormId)return;
   const f=forms.find(x=>x.id===currentFormId);
   if(f){f.questionCount=items.filter(it=>it.kind==='question').length;_invalidateSortedForms();}
-  dbPutOne(STORE_QUESTIONS,{formId:currentFormId,items:JSON.parse(JSON.stringify(items))})
-    .catch(e=>console.warn('persistQuestions:',e));
+  const snapshot=JSON.parse(JSON.stringify(items));
+  _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:currentFormId,items:snapshot}), {label:'persistQuestions'});
 }
 function loadQuestions(formId){
   return dbGetOne(STORE_QUESTIONS,formId)
@@ -6430,7 +6535,10 @@ function retrogradeScoreAttempts(formId, opts, questionsOverride){
   // loaded into this tab's memory) would be wiped by the old persistAttempts()
   // clear+rewrite pattern.
   formAttempts.forEach(a=>{
-    dbPutOne(STORE_ATTEMPTS,a).catch(e=>console.warn('retrogradeScoreAttempts dbPutOne:',e));
+    _persistWithRetry(()=>dbPutOne(STORE_ATTEMPTS,a), {
+      label:'retrogradeScoreAttempts dbPutOne',
+      failMsg:'Could not save a rescored attempt — try Rescore again.'
+    });
   });
   updateAttemptsCounts();
   renderDashboard();
@@ -6462,7 +6570,7 @@ function manualRescoreForm(){
 function rescoreOneAttempt(answers,questions){
   let earned=0,total=0,correct=0,wrong=0,hasScorable=false;
   questions.forEach(q=>{
-    const pts=parseInt(q.points)||0;
+    const pts=parseInt(q.points,10)||0;
     total+=pts;
     const handler=QUESTION_TYPES[q.type];
     if(!handler)return;
@@ -6655,7 +6763,10 @@ function saveAttempt(sd){
   };
   setState({attempts:[newAttempt,...attempts]});
   // Upsert only the new record — never clear the store.
-  dbPutOne(STORE_ATTEMPTS,newAttempt).catch(e=>console.warn('saveAttempt dbPutOne:',e));
+  _persistWithRetry(()=>dbPutOne(STORE_ATTEMPTS,newAttempt), {
+    label:'saveAttempt dbPutOne',
+    failMsg:'Could not save this attempt — your score may not have been kept.'
+  });
   updateAttemptsCounts();
 }
 function getFormAttemptCount(fid){return attempts.filter(a=>a.formId===fid).length;}
@@ -6775,7 +6886,7 @@ function reassignAttempt(attemptId,newFormId){
     attempts: attempts.map(x => x.id===attemptId ? updated : x)
   });
   // Upsert only the one reassigned record — never clear the store.
-  dbPutOne(STORE_ATTEMPTS,updated).catch(e=>console.warn('reassignAttempt dbPutOne:',e));
+  _persistWithRetry(()=>dbPutOne(STORE_ATTEMPTS,updated), {label:'reassignAttempt dbPutOne'});
   renderAttemptsModal();
   renderDashboard();
   showShortcutToast('Attempt moved to "'+f.title+'"');
@@ -6837,7 +6948,7 @@ function computeAttemptResults(a){
     const ans=a.answers?((a.answers[sq.id]!==undefined)?a.answers[sq.id]:a.answers[String(sq.id)]):undefined;
     const hasCorrect=handler.hasCorrect(q);
     const{correct=false}=handler.score(q,ans)||{};
-    const pts=parseInt(q.points)||0;
+    const pts=parseInt(q.points,10)||0;
     results.push({q,ans,correct,hasCorrect,pts,earned:correct?pts:0,isLive:!!live});
   });
   return results;
@@ -6895,6 +7006,14 @@ function renderAttemptDetailModal(attemptId){
         acceptAnswerAsCorrect(a.formId,q.id,ans).then(()=>{
           renderAttemptDetailModal(attemptId);
           renderAttemptsModal();
+        }).catch(e=>{
+          // BUG FIX (Round 3): previously had no .catch here at all, so a
+          // failed save left this button disabled with "Accepting…" showing
+          // forever and produced an unhandled promise rejection. The toast
+          // is already shown by _persistWithRetry inside
+          // acceptAnswerAsCorrect(); this just un-sticks the button.
+          console.warn('acceptAnswerAsCorrect failed:',e);
+          btn.disabled=false;btn.textContent='✓ Accept this answer as correct';
         });
       });
       acceptRow.appendChild(btn);
@@ -6951,7 +7070,17 @@ async function acceptAnswerAsCorrect(formId,qid,rawAnswer){
     triggerAutoSave();
     renderBuilder();
   } else {
-    await dbPutOne(STORE_QUESTIONS,{formId:formId,items:qList});
+    // NOTE: this was previously an uncaught `await dbPutOne(...)` with no
+    // .catch anywhere in the chain (the caller only attaches .then(), see
+    // the "Accept this answer as correct" button handler). A failed write
+    // used to be an unhandled promise rejection AND leave the button stuck
+    // reading "Accepting…" forever with no way to retry. _persistWithRetry
+    // still rethrows on final failure so this function's rejection reaches
+    // the caller, which now has a .catch() that resets the button.
+    await _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:formId,items:qList}), {
+      label:'acceptAnswerAsCorrect dbPutOne',
+      failMsg:'Could not save the accepted answer — try again.'
+    });
   }
 
   await retrogradeScoreAttemptsForForm(formId,{force:true});
@@ -8487,7 +8616,10 @@ function duplicateForm(id){
   c.id=newId;c.title+=' (Copy)';c.createdAt=Date.now();c.updatedAt=Date.now();
   forms.push(c);_invalidateSortedForms();
   loadQuestions(id).then(qItems=>{
-    dbPutOne(STORE_QUESTIONS,{formId:newId,items:qItems}).catch(()=>{});
+    _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:newId,items:qItems}), {
+      label:'duplicateForm questions',
+      failMsg:'The duplicated form\u2019s questions may not have saved — check the copy.'
+    });
     persistFormById(newId);renderDashboard();
   }).catch(()=>{persistFormById(newId);renderDashboard();});
 }
@@ -8932,7 +9064,7 @@ function _virtAppend(list, qs, targetEnd){
     frag.appendChild(node);
   }
   list.querySelectorAll('.virt-placeholder').forEach(ph=>{
-    const idx=parseInt(ph.dataset.virtIdx);
+    const idx=parseInt(ph.dataset.virtIdx,10);
     if(idx>=from&&idx<to) ph.remove();
   });
 
@@ -9114,7 +9246,7 @@ function updateStats(){
   // incremented on add/duplicate, decremented on delete, recomputed on undo/redo/load.
   // This avoids the three O(n) items.filter() passes that previously ran on every
   // render, every bindBuilderEvents call, and every virtual-scroll append.
-  const pts=items.reduce((a,it)=>it.kind==='question'?a+(parseInt(it.points)||0):a,0);
+  const pts=items.reduce((a,it)=>it.kind==='question'?a+(parseInt(it.points,10)||0):a,0);
   const qEl=document.getElementById('stat-q-count');
   const sEl=document.getElementById('stat-s-count');
   const pEl=document.getElementById('stat-pts');
@@ -9377,7 +9509,7 @@ function _breadcrumbMenuKeydown(e){
 
 // Called when the user picks a section from the jump dropdown.
 function jumpToSection(selectEl){
-  const id=parseInt(selectEl.value);
+  const id=parseInt(selectEl.value,10);
   if(!id) return;
   selectEl.value=''; // reset to placeholder so it's always a "jump" action
   _jumpToSectionId(id);
@@ -9428,7 +9560,7 @@ function bindBuilderEvents(){
       if(it.options){it.options.forEach((_,idx)=>{const oi=document.querySelector(`.opt-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(oi){oi.removeEventListener('input',oi._h);oi._h=e=>updateOption(it.id,idx,e.target.value);oi.addEventListener('input',oi._h);}});}
       if(it.pairs){it.pairs.forEach((_,idx)=>{const pl=document.querySelector(`.pair-left[data-qid="${it.id}"][data-idx="${idx}"]`);const pr=document.querySelector(`.pair-right[data-qid="${it.id}"][data-idx="${idx}"]`);if(pl){pl.removeEventListener('input',pl._h);pl._h=e=>updatePairLeft(it.id,idx,e.target.value);pl.addEventListener('input',pl._h);}if(pr){pr.removeEventListener('input',pr._h);pr._h=e=>updatePairRight(it.id,idx,e.target.value);pr.addEventListener('input',pr._h);}});}
       if(it.acceptableAnswers){it.acceptableAnswers.forEach((_,idx)=>{const ai=document.querySelector(`.trans-ans-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(ai){ai.removeEventListener('input',ai._h);ai._h=e=>updateAcceptableAnswer(it.id,idx,e.target.value);ai.addEventListener('input',ai._h);}});}
-      const pi=document.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value)||0;triggerAutoSave();}};pi.addEventListener('input',pi._h);}
+      const pi=document.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value,10)||0;triggerAutoSave();}};pi.addEventListener('input',pi._h);}
       const ts=document.querySelector(`.trans-source[data-qid="${it.id}"]`);if(ts){ts.removeEventListener('input',ts._h);ts._h=e=>{
         const q=items.find(x=>x.id===it.id);
         if(q){
@@ -10284,7 +10416,7 @@ function initCardDragDrop(){
   document.querySelectorAll('#questions-list [data-itemid]').forEach(card=>{
     if(card._dragStartH)card.removeEventListener('dragstart',card._dragStartH);
     card._dragStartH=e=>{
-      dragSrcId=parseInt(card.dataset.itemid);
+      dragSrcId=parseInt(card.dataset.itemid,10);
       card.classList.add('dragging-card');
       e.dataTransfer.effectAllowed='move';
     };
@@ -10301,7 +10433,7 @@ function initCardDragDrop(){
     if(card._dragOverH)card.removeEventListener('dragover',card._dragOverH);
     card._dragOverH=e=>{
       e.preventDefault();
-      const tid=parseInt(card.dataset.itemid);
+      const tid=parseInt(card.dataset.itemid,10);
       if(tid===dragSrcId)return;
       document.querySelectorAll('.drag-over-card').forEach(c=>c.classList.remove('drag-over-card'));
       const rect=card.getBoundingClientRect();
@@ -10325,7 +10457,7 @@ function initCardDragDrop(){
       e.preventDefault();
       card.classList.remove('drag-over-card');
       _removeDragGap();
-      const tid=parseInt(card.dataset.itemid);
+      const tid=parseInt(card.dataset.itemid,10);
       if(dragSrcId===tid)return;
       const fi=items.findIndex(it=>it.id===dragSrcId);
       let ti=items.findIndex(it=>it.id===tid);
@@ -10413,7 +10545,13 @@ function _savePreviewDraft(){
     previewOptionsOrder: randomizeOptionsEnabled ? previewOptionsOrder : {},
     savedAt: Date.now(),
   };
-  return dbPutOne(STORE_DRAFTS, draft);
+  // DECISION (Round 3, item 1): retry once like every other write site, but
+  // deliberately pass silent:true — this fires on every keystroke/timer
+  // tick via the 800ms debounce below, so a toast per failure would spam
+  // the user far more than the risk it's guarding against (worst case is
+  // losing in-progress preview answers, not a saved quiz/attempt). The
+  // failure is still console.warn'd for devtools visibility, same as before.
+  return _persistWithRetry(()=>dbPutOne(STORE_DRAFTS, draft), {label:'Preview draft autosave', silent:true});
 }
 // Debounced so rapid-fire typing / timer ticks don't hammer the DB. Failures
 // are logged (not thrown into the void) so a broken autosave is at least
@@ -10441,9 +10579,18 @@ function _loadPreviewDraft(formId){
         const legacy = JSON.parse(raw);
         if(!legacy || typeof legacy!=='object') return null;
         const migrated = {...legacy, formId};
-        // Fire-and-forget the migration write; don't block showing the resume prompt on it.
-        dbPutOne(STORE_DRAFTS, migrated).catch(e=>console.warn('Legacy draft migration failed:',e));
-        try{ localStorage.removeItem(_previewDraftKey(formId)); }catch(_){}
+        // BUG FIX (Round 3, item 1): this used to remove the legacy
+        // localStorage copy unconditionally, in parallel with (not after)
+        // the fire-and-forget IndexedDB write. If that write failed, both
+        // copies were gone — the localStorage source had already been
+        // deleted before the migration was confirmed, a genuine data-loss
+        // path rather than just an unsurfaced one. Now the localStorage
+        // copy is only removed once the IndexedDB write (with its one
+        // retry) actually succeeds; on failure it's left in place so the
+        // next load can retry the migration instead of losing the draft.
+        _persistWithRetry(()=>dbPutOne(STORE_DRAFTS, migrated), {label:'Legacy draft migration', silent:true})
+          .then(()=>{ try{ localStorage.removeItem(_previewDraftKey(formId)); }catch(_){} })
+          .catch(e=>console.warn('Legacy draft migration failed — keeping legacy localStorage copy for retry:',e));
         return migrated;
       }catch(e){
         return null;
@@ -11047,7 +11194,7 @@ function initDragDropPreviews(){
       if(e.key!=='Enter'&&e.key!==' ')return;
       e.preventDefault();
       const itemId=el.dataset.itemid;
-      const qid=parseInt(el.dataset.qid);
+      const qid=parseInt(el.dataset.qid,10);
       if(_kbPendingItem&&_kbPendingItem.itemId===itemId){
         // Toggle off — deselect
         _clearKbSelection();
@@ -11074,7 +11221,7 @@ function initDragDropPreviews(){
       if(e.key!=='Enter'&&e.key!==' ')return;
       if(!_kbPendingItem)return; // nothing selected from bank
       // Only handle slots belonging to the same question
-      const qid=parseInt(el.dataset.qid);
+      const qid=parseInt(el.dataset.qid,10);
       if(qid!==_kbPendingItem.qid)return;
       e.preventDefault();
       const slotId=el.dataset.slotid;
@@ -11199,7 +11346,7 @@ function computeScore(){
   const previewList=previewPages.flat();
   const qs=previewList.filter(it=>it.kind==='question');let earned=0,total=0,results=[];
   qs.forEach(q=>{
-    const pts=parseInt(q.points)||0;total+=pts;
+    const pts=parseInt(q.points,10)||0;total+=pts;
     const ans=previewAnswers[q.id];
     const handler=QUESTION_TYPES[q.type];
     const {correct=false}=handler?handler.score(q,ans):{};
@@ -12611,17 +12758,34 @@ async function _processShareImport(file, statusEl){
       _validateAndPreviewLib(data);
       const existingIds=new Set(forms.map(f=>f.id));
       const newForms=(data.forms||[]).filter(f=>!existingIds.has(f.id));
+      // BUG FIX (Round 3, item 1): each per-question write below used to be
+      // `.catch(()=>{})` — a write failure was swallowed completely, yet
+      // the code still went on to report "Imported N forms successfully!".
+      // That form would then look empty (no questions) on next reload, a
+      // silent-looking success that was actually silent data loss. Now
+      // failures are counted and the status message reflects reality.
+      let failedWrites=0;
       for(const qRec of (data.questions||[])){
-        if(!existingIds.has(qRec.formId))await dbPutOne(STORE_QUESTIONS,{formId:qRec.formId,items:qRec.items||[]}).catch(()=>{});
+        if(!existingIds.has(qRec.formId)){
+          try{
+            await _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:qRec.formId,items:qRec.items||[]}), {label:'share import questions', silent:true});
+          }catch(e){ failedWrites++; }
+        }
       }
       const existingAttIds=new Set(attempts.map(a=>a.id));
       const newAttempts=(data.attempts||[]).filter(a=>!existingAttIds.has(a.id));
       setState({forms:[...forms,...newForms],attempts:[...attempts,...newAttempts]});
       await dbPutAll(STORE_FORMS,forms);await dbPutAll(STORE_ATTEMPTS,attempts);
       updateAttemptsCounts();renderDashboard();
-      statusEl.className='share-status ok';
-      statusEl.textContent=`✅ Imported ${newForms.length} form${newForms.length!==1?'s':''} successfully!`;
-      showShortcutToast('Form imported ✓');
+      if(failedWrites>0){
+        statusEl.className='share-status err';
+        statusEl.textContent=`⚠️ Imported ${newForms.length} form${newForms.length!==1?'s':''}, but ${failedWrites} question set${failedWrites!==1?'s':''} failed to save — ${failedWrites!==1?'those forms':'that form'} may show as empty. Try importing again.`;
+        showShortcutToast('Import partially failed — see the import dialog for details');
+      } else {
+        statusEl.className='share-status ok';
+        statusEl.textContent=`✅ Imported ${newForms.length} form${newForms.length!==1?'s':''} successfully!`;
+        showShortcutToast('Form imported ✓');
+      }
     }catch(err){statusEl.className='share-status err';statusEl.textContent='❌ Invalid file: '+err.message;}
   };
   reader.readAsText(file);
@@ -12825,6 +12989,15 @@ async function confirmLibImport(){
 
   const btn=document.getElementById('lib-confirm-btn');
   btn.textContent='Importing…';btn.disabled=true;
+  // BUG FIX (Round 3, item 1): the per-question dbPutOne calls in both
+  // branches below used to be `.catch(()=>{})` inside these loops, so a
+  // write failure never reached the outer try/catch — this whole flow
+  // would still show "Library replaced/merged successfully ✓" even if some
+  // forms' questions never actually made it into IndexedDB. That's the
+  // most severe case in this pass: an explicit, deliberate bulk-data
+  // operation confirming success while silently corrupting the result.
+  // failedWrites is now tracked and folded into the final toast.
+  let failedWrites=0;
 
   try{
     if(_libMode==='replace'){
@@ -12835,7 +13008,9 @@ async function confirmLibImport(){
       const newAttempts=data.attempts||[];
       setState({forms:newForms,attempts:newAttempts});
       for(const qRec of (data.questions||[])){
-        await dbPutOne(STORE_QUESTIONS,{formId:qRec.formId,items:qRec.items||[]}).catch(()=>{});
+        try{
+          await _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:qRec.formId,items:qRec.items||[]}), {label:'library import (replace) questions', silent:true});
+        }catch(e){ failedWrites++; }
       }
       await dbPutAll(STORE_FORMS,newForms);
       await dbPutAll(STORE_ATTEMPTS,newAttempts);
@@ -12854,7 +13029,9 @@ async function confirmLibImport(){
       const newAttempts=(data.attempts||[]).filter(a=>!existingAttIds.has(a.id));
       for(const qRec of (data.questions||[])){
         if(!existingIds.has(qRec.formId)){
-          await dbPutOne(STORE_QUESTIONS,{formId:qRec.formId,items:qRec.items||[]}).catch(()=>{});
+          try{
+            await _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:qRec.formId,items:qRec.items||[]}), {label:'library import (merge) questions', silent:true});
+          }catch(e){ failedWrites++; }
         }
       }
       setState({forms:[...forms,...newForms],attempts:[...attempts,...newAttempts]});
@@ -12876,7 +13053,11 @@ async function confirmLibImport(){
     renderDashboard();
     closeLibModal();
     const mode=_libMode==='replace'?'replaced':'merged';
-    showShortcutToast('Library '+mode+' successfully ✓');
+    if(failedWrites>0){
+      showShortcutToast(`Library ${mode}, but ${failedWrites} question set${failedWrites!==1?'s':''} failed to save — reload and re-import if any forms look empty.`);
+    } else {
+      showShortcutToast('Library '+mode+' successfully ✓');
+    }
   }catch(err){
     _showLibStatus('err','❌ Import failed: '+err.message);
     btn.textContent='Import Now';btn.disabled=false;
@@ -12904,6 +13085,16 @@ function isTypingFocus(){
 // Applied to: Bank, Share, Attempts, Attempt detail, Import, Lib modals.
 let _focusTrapEl=null;
 let _focusTrapPrevEl=null;
+// Stack of {modal, prevEl} entries for every *outer* trap that is still open
+// but not currently on top (e.g. a confirm/alert dialog opened from within
+// an already-open modal pushes that modal here). _focusTrapEl/_focusTrapPrevEl
+// always mirror the top of [..._focusTrapStack, {modal:_focusTrapEl,prevEl:_focusTrapPrevEl}].
+// Round 4 fix: previously these were a single slot, so closing a nested
+// dialog (_releaseFocusTrap) nulled _focusTrapEl even though the outer modal
+// was still open and its own keydown listeners were still attached — Tab no
+// longer wrapped focus inside it (a real focus-trap escape) and Escape no
+// longer closed it, until the outer modal was closed and reopened.
+let _focusTrapStack=[];
 const FOCUS_SELECTORS='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 // Phase 3 — maps a modal's id to its own close function, so ESC can close
@@ -12923,6 +13114,10 @@ const _MODAL_ESC_CLOSERS={
 };
 
 function _trapFocus(modal){
+  // If a trap is already active (e.g. a confirm/alert dialog opening from
+  // within an already-open modal), push it so we can restore it — instead
+  // of overwriting/losing it — when this inner trap releases.
+  if(_focusTrapEl){_focusTrapStack.push({modal:_focusTrapEl,prevEl:_focusTrapPrevEl});}
   _focusTrapPrevEl=document.activeElement;
   _focusTrapEl=modal;
   modal.addEventListener('keydown',_handleTrapKeydown);
@@ -12936,6 +13131,15 @@ function _releaseFocusTrap(){
   }
   if(_focusTrapPrevEl){try{_focusTrapPrevEl.focus();}catch(_){}}
   _focusTrapPrevEl=null;
+  // Restore the next-outer trap (if any) so it keeps working: its keydown
+  // listeners are still attached to its modal element and were never
+  // touched by the inner trap's teardown above, so re-pointing the globals
+  // at it is enough to make Tab-wrapping and Escape-to-close work again.
+  if(_focusTrapStack.length){
+    const outer=_focusTrapStack.pop();
+    _focusTrapEl=outer.modal;
+    _focusTrapPrevEl=outer.prevEl;
+  }
 }
 function _handleTrapKeydown(e){
   if(e.key!=='Tab')return;
