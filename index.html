@@ -522,6 +522,16 @@ body.role-viewer #integrity-banner{display:flex}
 .btn-import:hover{background:var(--purple-light)}
 .import-error{font-size:12px;color:var(--red);margin-top:7px;padding:7px 10px;background:var(--red-bg);border-radius:5px;display:none}
 .import-error.show{display:block}
+/* Target-section picker at the top of the Import Questions modal. Imported
+   questions used to always land at the very end of the whole quiz (i.e. the
+   last section) regardless of what the author was looking at — this control
+   lets them choose exactly which section the batch should land in, and
+   doImport() honors it (see _buildImportTargetSectionOptions / doImport). */
+.import-target-row{display:flex;align-items:center;gap:9px;margin-bottom:14px;padding:9px 11px;background:var(--surface2);border:1px solid var(--border-light);border-radius:8px}
+.import-target-row label{font-size:12px;font-weight:600;color:var(--text2);white-space:nowrap;flex-shrink:0}
+.import-target-select{flex:1;min-width:0;border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:12.5px;color:var(--text);background:var(--surface);outline:none;cursor:pointer;transition:border-color .12s var(--ease),box-shadow .12s var(--ease)}
+.import-target-select:focus{border-color:var(--purple);box-shadow:var(--shadow-focus)}
+.import-target-select:disabled{cursor:not-allowed;opacity:.6}
 .file-drop{border:2px dashed var(--border);border-radius:9px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:10px}
 .file-drop:hover,.file-drop.drag-over{border-color:var(--purple);background:var(--purple-dim)}
 .file-drop-icon{font-size:26px;margin-bottom:7px}
@@ -3939,6 +3949,10 @@ try{
       <button class="modal-close" onclick="closeImportModal()" aria-label="Close import questions modal">×</button>
     </div>
     <div class="modal-body">
+      <div class="import-target-row">
+        <label for="import-target-section">Import into</label>
+        <select class="import-target-select" id="import-target-section" aria-label="Section to import these questions into"></select>
+      </div>
       <div class="modal-tabs">
         <button class="modal-tab active" id="mtab-text" onclick="switchModalTab('text')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>Paste Text</button>
         <button class="modal-tab" id="mtab-json" onclick="switchModalTab('json')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3a2 2 0 00-2 2v3a2 2 0 01-2 2 2 2 0 012 2v3a2 2 0 002 2"/><path d="M16 3a2 2 0 012 2v3a2 2 0 002 2 2 2 0 00-2 2v3a2 2 0 01-2 2"/></svg>JSON</button>
@@ -11628,7 +11642,41 @@ function shareResults(sc,formTitle){
 //   text  → plain-text Q: / A: / CORRECT: format
 //   json  → raw JSON array pasted into a textarea
 //   file  → .txt or .json file drag-and-drop / file picker
-function openImportModal(){document.getElementById('import-modal').style.display='flex';setState({pendingFileContent:''});document.getElementById('file-name').textContent='';document.getElementById('import-text-input').value='';document.getElementById('import-json-input').value='';hideErrors();}
+function openImportModal(){document.getElementById('import-modal').style.display='flex';setState({pendingFileContent:''});document.getElementById('file-name').textContent='';document.getElementById('import-text-input').value='';document.getElementById('import-json-input').value='';hideErrors();_buildImportTargetSectionOptions();}
+// Populates the "Import into" section picker in the Import Questions modal
+// and pre-selects a sensible default, instead of the old hardcoded "always
+// append to the very end of the quiz" behavior (which meant bulk imports
+// silently always landed in the LAST section, no matter which section the
+// author had open). Default preference, most-specific first:
+//   1. the section the currently-selected card belongs to (the author is
+//      almost certainly mid-way through editing that section);
+//   2. the last existing section (keeps the old "append" behavior as a
+//      reasonable fallback when nothing is selected);
+//   3. "No section (top)" when the quiz has no sections yet.
+function _buildImportTargetSectionOptions(){
+  const sel=document.getElementById('import-target-section');
+  if(!sel)return;
+  sel.innerHTML='';
+  const topOpt=document.createElement('option');topOpt.value='__top__';topOpt.textContent='No section (top)';
+  sel.appendChild(topOpt);
+  const sectionsList=items.filter(it=>it.kind==='section');
+  sectionsList.forEach(s=>{
+    const o=document.createElement('option');o.value=String(s.id);
+    o.textContent=_plainTextTitle(s.title)||'Untitled section';
+    sel.appendChild(o);
+  });
+  let defaultVal='__top__';
+  if(selectedId!=null){
+    const curSec=_currentSectionIdForItem(selectedId);
+    if(curSec!=='__top__')defaultVal=String(curSec);
+  }
+  if(defaultVal==='__top__'&&sectionsList.length){
+    defaultVal=String(sectionsList[sectionsList.length-1].id);
+  }
+  sel.value=defaultVal;
+  sel.disabled=sectionsList.length===0;
+  sel.title=sectionsList.length===0?'Add a section first to file imported questions under one':'Choose which section these imported questions should be added to';
+}
 function closeImportModal(){document.getElementById('import-modal').style.display='none';}
 function handleModalOverlayClick(e){if(e.target===document.getElementById('import-modal'))closeImportModal();}
 function switchModalTab(tab){setState({activeModalTab:tab});['text','json','file'].forEach(t=>{document.getElementById('mtab-'+t).classList.toggle('active',t===tab);document.getElementById('import-'+t+'-panel').style.display=t===tab?'block':'none';});}
@@ -11659,12 +11707,54 @@ function doImport(){
     // couldn't fully make sense of, so a malformed paste doesn't silently
     // produce a broken question the author has no reason to suspect.
     const shakyCount=imported.filter(q=>q.type==='radio'&&(!q.options||q.options.length<2)).length;
+
+    // BUG FIX: this used to always `items.push(q)`, which appends to the very
+    // end of the flat `items` array. Since section membership is derived
+    // purely from array position (a question belongs to whichever section
+    // marker precedes it — see _currentSectionIdForItem), appending to the
+    // end of the WHOLE array meant every bulk import silently landed in the
+    // LAST section of the quiz, no matter which section the admin had open,
+    // selected, or scrolled to. Instead, resolve the target section chosen
+    // in the "Import into" picker (see _buildImportTargetSectionOptions) and
+    // splice the imported block in right after that section's existing
+    // questions — before the next section marker — using the same insertion
+    // rule as moveQuestionToSection().
+    const targetSel=document.getElementById('import-target-section');
+    const rawTarget=targetSel?targetSel.value:'__top__';
+    const targetSectionId=(!rawTarget||rawTarget==='__top__')?'__top__':(isNaN(Number(rawTarget))?rawTarget:Number(rawTarget));
+
+    let insertAt;
+    let targetLabel='the top (no section)';
+    if(targetSectionId==='__top__'){
+      insertAt=0;
+    }else{
+      const si=items.findIndex(it=>it.kind==='section'&&it.id===targetSectionId);
+      if(si===-1){
+        // Target section vanished (e.g. deleted while the modal was open) —
+        // fall back to the end of the quiz rather than losing the import.
+        insertAt=items.length;
+      }else{
+        insertAt=si+1;
+        while(insertAt<items.length&&items[insertAt].kind!=='section')insertAt++;
+        targetLabel=_plainTextTitle(items[si].title)||'the selected section';
+      }
+    }
+
     pushHistory('Import '+imported.length+' question'+(imported.length!==1?'s':''));
-    imported.forEach(q=>{q.id=_allocId();q.kind='question';items.push(q);});
+    const newQs=imported.map(q=>{q.id=_allocId();q.kind='question';return q;});
+    items.splice(insertAt,0,...newQs);
     _recomputeItemCounters(); // keep questionCount in sync after bulk import
-    closeImportModal();renderBuilder();triggerAutoSave();
+    closeImportModal();
+    // Match the addQuestion()/addSection() pattern: resolve which builder
+    // page the new content lives on BEFORE renderBuilder() paints, so the
+    // author lands on the section they imported into instead of wherever
+    // the builder happened to be scrolled before.
+    jumpToItemPage(newQs[0].id);
+    renderBuilder();triggerAutoSave();
     if(shakyCount>0){
       showShortcutToast(shakyCount+' imported question'+(shakyCount!==1?'s':'')+' had unrecognized answer choices — please review before publishing.');
+    }else{
+      showShortcutToast('Imported '+newQs.length+' question'+(newQs.length!==1?'s':'')+' into '+targetLabel+'.');
     }
   }catch(err){showError('import-'+(activeModalTab==='text'?'text':activeModalTab)+'-error','Parse error: '+err.message);}
 }
