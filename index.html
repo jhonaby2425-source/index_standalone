@@ -1231,6 +1231,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .preview-stripe{height:6px!important;-webkit-print-color-adjust:exact}
   .preview-section-hdr{border-left:3px solid #666!important}
 
+  /* CLUE HINTS: the [bracketed]/"(Clue: ...)" tap-to-reveal spoiler is a
+     study-mode affordance for students taking the quiz on-screen — tapping
+     it doesn't exist on paper, so leaving it in the printed/PDF output just
+     shows a solid gray blob (unrevealed) or gives away the answer
+     (revealed) sitting inline in the sentence. It never belongs in a
+     printed quiz, so it's removed from the flow entirely rather than just
+     visually masked — the surrounding sentence text reflows around it. */
+  .p-spoiler{display:none!important}
+
+  /* Belt-and-suspenders: the "Loading your quiz…"/"No questions yet"
+     placeholder (.empty-state) should only ever be on-screen for a moment
+     while the Preview tab's data is still loading (see _enterPreviewTab()).
+     If a print is ever triggered while it's still in the DOM — the actual
+     bug fixed in printQuiz()/testForm()/switchTab() below — this stops it
+     from being captured as a near-blank printed/PDF page. */
+  .empty-state{display:none!important}
+
   @page{margin:18mm 16mm;size:A4}
   h1,h2,h3{color:#000!important}
 }
@@ -3224,6 +3241,11 @@ body.theme-classic .js-label-wrap .q-label-input{width:100%}
   }
   body.print-mode #questions-tab { display: none !important; }
   body.print-mode #preview-tab { display: block !important; }
+  /* Redundant with the .p-spoiler/.empty-state rules in the main @media
+     print stylesheet (see the §INTEGRITY block's comment above this style
+     tag for why print CSS is duplicated here) — belt-and-suspenders in case
+     that stylesheet fails to apply. */
+  .p-spoiler, .empty-state { display: none !important; }
 </style>
 </head>
 <body>
@@ -8649,7 +8671,13 @@ function testForm(id){
   // the Preview entry logic — which is what actually starts the countdown.
   // Only admins need this: openForm() puts admins on 'questions' and this
   // is what actually moves them over to 'preview' for Test mode.
-  const goToPreview=()=>{ if(_isAdmin) switchTab('preview'); };
+  // Returns switchTab('preview')'s promise (rather than firing it and
+  // moving on) so callers that print a form they don't currently have open
+  // — the Share modal's "Print blank quiz" button — can await this whole
+  // chain and only hand off to _hardenedPrint() once the Preview pane has
+  // actually finished loading real content. See printQuiz()'s comment for
+  // the bug this fixes (print capturing the "Loading your quiz…" state).
+  const goToPreview=()=>{ return _isAdmin ? switchTab('preview') : Promise.resolve(); };
   return openForm(id).then(goToPreview).catch(goToPreview);
 }
 async function deleteForm(id){if(!_isAdmin){showShortcutToast('Only the admin can delete forms.');return;}if(!await _confirmModal('Delete this form?\n\nAll questions will be permanently removed.','Delete','Cancel'))return;setState({forms:forms.filter(x=>x.id!==id)});deleteQuestions(id);dbDeleteOne(STORE_FORMS,id).catch(()=>{});renderDashboard();}
@@ -8701,6 +8729,13 @@ function applyTheme(hex){const f=forms.find(x=>x.id===currentFormId);if(!f)retur
 // frames so layout is fully settled, guards against double-firing, and
 // always restores the UI afterwards.
 let _isPrinting = false;
+// Tracks the in-flight _enterPreviewTab() setup (draft lookup, the
+// "Resume or Start Over?" confirm dialog, and the first renderPreview()
+// call). switchTab() assigns this every time it (re)enters the Preview tab
+// fresh; printQuiz() awaits it so a print can never fire while the pane
+// still shows the transient "Loading your quiz…" placeholder — see the
+// ROOT CAUSE comment on printQuiz() below.
+let _previewEntryPromise = Promise.resolve();
 function _hardenedPrint(){
   if(_isPrinting) return;
   _isPrinting = true;
@@ -8749,7 +8784,21 @@ function _hardenedPrint(){
 
 // Print the quiz (Questions/Preview builder view) as a PDF — used by the
 // builder topbar Print button and the Preview tab's Print buttons.
-function printQuiz(){
+//
+// ROOT CAUSE (blank/incomplete printed pages showing "Loading your quiz…"):
+// switchTab('preview') funnels into _enterPreviewTab(), which is async —
+// it blanks #preview-content to a "Loading your quiz…" placeholder, then
+// awaits the questions-load promise and (if a saved draft exists) an
+// async "Resume or Start Over?" confirm dialog, before finally calling
+// renderPreview() with the real questions. This function used to call
+// switchTab('preview') and immediately fall through to _hardenedPrint()
+// on the very next line without waiting for any of that to finish, so
+// window.print()/"Save as PDF" would capture whatever was in the DOM at
+// that instant — typically still the "Loading your quiz…" placeholder,
+// exactly as reported. The fix is to await the full Preview-entry
+// sequence (via the shared _previewEntryPromise, updated below in
+// switchTab()) before ever invoking the print engine.
+async function printQuiz(){
   // Defense-in-depth: the buttons that call this are already hidden for
   // viewer/test-mode accounts (.admin-only), and the @media print CSS rule
   // (§INTEGRITY) blocks the OS-level print dialog too, but this stops the
@@ -8757,7 +8806,14 @@ function printQuiz(){
   // browser console) by a signed-in test user.
   if(!_isAdmin){ showShortcutToast('Printing is disabled for test-mode accounts.'); return; }
   if(document.getElementById('preview-tab').style.display!=='block'){
-    switchTab('preview');
+    await switchTab('preview');
+  } else {
+    // Already showing the Preview pane, but _enterPreviewTab()'s async
+    // setup for the CURRENT visit may still be in flight (e.g. Print was
+    // clicked immediately after switching tabs, or while the "Resume /
+    // Start Over?" dialog is still open) — wait for it too, for the same
+    // reason as above.
+    await _previewEntryPromise;
   }
   _hardenedPrint();
 }
@@ -8785,11 +8841,20 @@ function switchTab(tab){
   if(tab==='preview'){
     if(wasOnPreview){
       // Re-clicking the Preview tab while already there shouldn't wipe an
-      // in-progress attempt — just re-render as-is.
+      // in-progress attempt — just re-render as-is. Synchronous, so the
+      // shared "is Preview ready?" promise is already resolved.
       buildPreviewPages();renderPreview();
-      return;
+      _previewEntryPromise = Promise.resolve();
+      return _previewEntryPromise;
     }
-    _enterPreviewTab();
+    // BUG FIX (blank/incomplete printed pages — see printQuiz()'s comment):
+    // _enterPreviewTab() is async and used to be fired here without the
+    // caller ever getting a way to know when it actually finishes. Callers
+    // that need the Preview pane to be fully populated before doing
+    // something else with it (currently: printQuiz()) await this via
+    // switchTab()'s return value / the shared _previewEntryPromise.
+    _previewEntryPromise = _enterPreviewTab();
+    return _previewEntryPromise;
   }
   else{
     // Force an immediate (non-debounced) draft save before stopping the
@@ -8797,6 +8862,7 @@ function switchTab(tab){
     // elapsed countdown/answers to the debounce window.
     _savePreviewDraft().catch(e=>console.warn('switchTab: draft flush failed:',e));
     stopPreviewTimer();updateStats();
+    return Promise.resolve();
   }
 }
 
