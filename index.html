@@ -333,9 +333,18 @@ body.role-viewer #integrity-banner{display:flex}
 .hdr-title-input::placeholder,.hdr-desc-input::placeholder{color:var(--text3)}
 .hdr-title-input:focus{border-bottom-color:var(--purple)}
 .hdr-desc-input:focus{border-bottom-color:var(--purple)}
-.hdr-stats{display:flex;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-light)}
+.hdr-stats{display:flex;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-light);flex-wrap:wrap;align-items:center}
 .hdr-stat{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px}
 .hdr-stat strong{color:var(--purple);font-size:13px}
+
+/* ── Duplicate-question review badge (header) ───────────────────────────────
+   Purely informational/navigational: flags possible duplicate question text
+   for the author to review. Never hides, deletes, or auto-merges anything —
+   see _computeDuplicateQuestionGroups()/openDuplicatesModal() in app.js. */
+.hdr-dup-btn{font:inherit;font-size:11px;line-height:1;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--r-full);padding:4px 10px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;transition:filter .12s}
+.hdr-dup-btn:hover{filter:brightness(0.96)}
+.hdr-dup-btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.hdr-dup-btn strong{color:var(--amber);font-size:12px}
 .theme-section{background:var(--surface);border-radius:10px;border:1.5px solid var(--border);padding:14px 18px}
 .theme-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .theme-grid{display:flex;gap:8px;flex-wrap:wrap}
@@ -407,6 +416,15 @@ body.role-viewer #integrity-banner{display:flex}
 .move-section-select-wrap{display:flex;align-items:center;gap:4px;margin-right:auto;min-width:0}
 .move-section-select-wrap svg{flex:none;color:var(--text3)}
 .q-num{order:-1;flex-shrink:0;min-width:30px;height:30px;padding:0 6px;margin-top:2px;border-radius:var(--r-full);background:var(--purple);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(230,83,44,.4);letter-spacing:0}
+
+/* ── Duplicate-question flag on a question card ─────────────────────────────
+   Applied by _refreshDuplicateFlags() when a question's text matches another
+   question in this quiz. Flag-only: text/order/content are never changed. */
+.q-card.has-duplicate{box-shadow:0 0 0 1.5px var(--amber) inset}
+.dup-flag{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;line-height:1;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--r-full);padding:4px 9px;margin-top:2px;cursor:pointer;white-space:nowrap;font-family:inherit}
+.dup-flag:hover{filter:brightness(0.96)}
+.dup-flag:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+body.theme-classic .dup-flag{margin-top:4px}
 .correct-ans-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;background:var(--green-bg);border-radius:7px;border:1px solid var(--green-border)}
 .correct-ans-label{font-size:11px;color:var(--green);font-weight:600;white-space:nowrap}
 .correct-ans-input{flex:1;border:none;border-bottom:1px solid var(--green-border);font-size:13px;color:var(--green);outline:none;padding:2px 0 3px;background:transparent}
@@ -1110,6 +1128,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .section-breadcrumb-label{max-width:130px}
   .section-breadcrumb-progress{display:none}
 }
+
+/* Duplicate Questions modal */
+.duplicates-modal{max-width:560px;width:100%}
+.duplicates-modal .modal-header{background:var(--amber)}
+.dup-modal-hint{padding:14px 20px 0;font-size:12.5px;color:var(--text2);line-height:1.5}
+.dup-groups-list{padding:12px 20px 18px;max-height:56vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.dup-group{border:1.5px solid var(--amber);background:var(--amber-bg);border-radius:10px;padding:10px 12px}
+.dup-group-hdr{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.dup-row{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;cursor:pointer;font-family:inherit;transition:border-color .12s}
+.dup-row+.dup-row{margin-top:6px}
+.dup-row:hover,.dup-row:focus-visible{border-color:var(--amber);outline:none}
+.dup-row-num{flex-shrink:0;font-size:11px;font-weight:700;color:#fff;background:var(--purple);border-radius:var(--r-full);padding:2px 8px;line-height:1.4}
+.dup-row-text{font-size:12.5px;color:var(--text);line-height:1.4;word-break:break-word}
+.dup-empty{padding:24px 20px;text-align:center;font-size:13px;color:var(--text3)}
 
 /* Bank modal */
 .bank-modal{max-width:600px;width:100%}
@@ -3675,6 +3707,9 @@ try{
               <div class="hdr-stat"><strong id="stat-q-count">0</strong> questions</div>
               <div class="hdr-stat"><strong id="stat-s-count">0</strong> sections</div>
               <div class="hdr-stat"><strong id="stat-pts">0</strong> total pts</div>
+              <button type="button" class="hdr-dup-btn" id="dup-warning-btn" style="display:none" onclick="openDuplicatesModal()" title="Review questions with matching text">
+                <span aria-hidden="true">⚠</span> <strong id="stat-dup-count">0</strong> <span id="dup-warning-label">possible duplicates</span>
+              </button>
             </div>
           </div>
         </div>
@@ -4136,6 +4171,29 @@ try{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="fab-icon"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
       Last
     </button>
+  </div>
+
+  <!-- ══ Duplicate Questions Modal ═══════════════════════════════════════════════
+       Read-only review surface for _computeDuplicateQuestionGroups(). Lists
+       groups of questions whose text matches; clicking a row jumps to that
+       question in the builder so the author can edit, merge, or leave it —
+       nothing here ever changes quiz content itself. -->
+  <span id="anchor-duplicates-modal" class="toc-anchor"></span>
+  <div class="modal-overlay" id="duplicates-modal" style="display:none" onclick="handleDuplicatesModalOverlay(event)" role="dialog" aria-modal="true" aria-labelledby="duplicates-modal-title">
+    <div class="modal duplicates-modal">
+      <div class="modal-header">
+        <span class="modal-title" id="duplicates-modal-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="modal-title-icon" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Possible Duplicate Questions
+        </span>
+        <button class="modal-close" onclick="closeDuplicatesModal()" aria-label="Close duplicate questions review">×</button>
+      </div>
+      <p class="dup-modal-hint">These questions have matching or near-identical text. Nothing has been changed — click a question to jump to it and decide whether to edit, keep, or remove it yourself.</p>
+      <div class="dup-groups-list" id="dup-groups-list" role="list"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeDuplicatesModal()">Close</button>
+      </div>
+    </div>
   </div>
 <script>
 // ══════════════════════════════════════════════════════════════════════════════
@@ -9321,6 +9379,174 @@ function builderGoPage(p){
   renderBuilder();
 }
 
+// §DUPLICATES ─────────────────────────────────────────────────────────────────
+// Flags questions whose text matches another question in the SAME quiz, so an
+// author can spot accidental duplicate sentences. This is detection-only:
+// nothing here ever edits, merges, reorders, or deletes a question — matches
+// are only surfaced (a badge on the card + a review modal) for the human to
+// decide what, if anything, to do about them.
+//
+// Cached at module scope so renderQCardNode() (called once per card, and
+// again for every lazily-appended virtual-scroll batch) can look up a
+// question's duplicate status in O(1) instead of recomputing the whole quiz
+// per card. _refreshDuplicateFlags() is the single place that recomputes and
+// keeps both the cache and the visible UI (header badge + per-card flags) in
+// sync; call it any time question text could have changed.
+let _dupGroupsCache=new Map();   // normalized text -> question items (size >= 2 only)
+let _dupQuestionIds=new Set();   // ids of every question that's in some group above
+
+/**
+ * Normalizes question text for duplicate comparison only — trims, collapses
+ * internal whitespace, lowercases, and drops one trailing sentence-ending
+ * punctuation mark. Purely a comparison key: the author's original text is
+ * never modified anywhere by this. E.g. "What is 2+2?" and "what is  2+2"
+ * normalize to the same key and are flagged as matching, but both keep their
+ * original text exactly as typed.
+ * @param {string} text
+ * @returns {string}
+ */
+function _normalizeForDupCheck(text){
+  if(!text)return '';
+  return String(text).trim().replace(/\s+/g,' ').toLowerCase().replace(/[.?!]+$/,'');
+}
+
+/**
+ * Groups the current form's questions by normalized text. Translation-type
+ * questions compare on sourceText (the actual sentence the student sees);
+ * every other type compares on label. Blank/near-blank text (<3 chars once
+ * normalized) is skipped so empty "Untitled" questions don't all flag each
+ * other. Read-only — takes no action on the items it finds.
+ * @returns {Map<string, Array<Object>>} normalized text -> matching question items (only groups of 2+)
+ */
+function _computeDuplicateQuestionGroups(){
+  const groups=new Map();
+  items.forEach(it=>{
+    if(it.kind!=='question')return;
+    const raw=it.type==='translation'?(it.sourceText||it.label):it.label;
+    const key=_normalizeForDupCheck(raw);
+    if(key.length<3)return;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(it);
+  });
+  for(const [key,arr] of groups){ if(arr.length<2) groups.delete(key); }
+  return groups;
+}
+
+// Recomputes duplicate groups and pushes the result into: (1) the header
+// "possible duplicates" badge, and (2) a live class/badge on every currently
+// rendered question card. Only rendered cards are touched (virtual scroll
+// means most large quizzes only have a window of cards in the DOM at any
+// time), and only cards whose flag state actually changed get a DOM write.
+function _refreshDuplicateFlags(){
+  _dupGroupsCache=_computeDuplicateQuestionGroups();
+  _dupQuestionIds=new Set();
+  _dupGroupsCache.forEach(arr=>arr.forEach(q=>_dupQuestionIds.add(q.id)));
+
+  const badge=document.getElementById('dup-warning-btn');
+  const countEl=document.getElementById('stat-dup-count');
+  const labelEl=document.getElementById('dup-warning-label');
+  if(badge){
+    const n=_dupQuestionIds.size;
+    badge.style.display=n?'inline-flex':'none';
+    if(countEl)countEl.textContent=String(n);
+    if(labelEl)labelEl.textContent=n===1?'possible duplicate':'possible duplicates';
+  }
+
+  const list=document.getElementById('questions-list');
+  if(!list)return;
+  list.querySelectorAll('.q-card[data-itemid]').forEach(card=>{
+    const id=Number(card.dataset.itemid);
+    const shouldFlag=_dupQuestionIds.has(id);
+    const isFlagged=card.classList.contains('has-duplicate');
+    if(shouldFlag===isFlagged)return; // nothing changed for this card — skip the DOM write
+    card.classList.toggle('has-duplicate',shouldFlag);
+    const labelWrap=card.querySelector('.js-label-wrap');
+    let flagEl=card.querySelector('.dup-flag');
+    if(shouldFlag){
+      if(!flagEl&&labelWrap){
+        flagEl=document.createElement('button');
+        flagEl.type='button';flagEl.className='dup-flag';
+        flagEl.textContent='⚠ Duplicate';
+        flagEl.addEventListener('click',e=>{e.stopPropagation();openDuplicatesModal();});
+        labelWrap.appendChild(flagEl);
+      }
+      if(flagEl){
+        const qs=items.filter(it=>it.kind==='question');
+        const q=qs.find(x=>x.id===id);
+        const key=q?_normalizeForDupCheck(q.type==='translation'?(q.sourceText||q.label):q.label):'';
+        const group=_dupGroupsCache.get(key)||[];
+        const others=group.filter(x=>x.id!==id).map(x=>'Q'+(qs.indexOf(x)+1));
+        flagEl.title=others.length?'Matches '+others.join(', ')+' — click to review':'Matches another question — click to review';
+        flagEl.setAttribute('aria-label',flagEl.title);
+      }
+    }else if(flagEl){
+      flagEl.remove();
+    }
+  });
+}
+
+// Opens the read-only duplicate-review modal. Groups are re-read from the
+// cache _refreshDuplicateFlags() last populated (kept fresh by updateStats()
+// and the translation-source handler), so this never re-scans on its own.
+function openDuplicatesModal(){
+  const list=document.getElementById('dup-groups-list');
+  const modal=document.getElementById('duplicates-modal');
+  if(!list||!modal)return;
+  list.innerHTML='';
+  const qs=items.filter(it=>it.kind==='question');
+  if(!_dupGroupsCache.size){
+    const emp=document.createElement('div');emp.className='dup-empty';
+    emp.textContent='No matching question text found. 🎉';
+    list.appendChild(emp);
+  }else{
+    let gi=0;
+    _dupGroupsCache.forEach(arr=>{
+      gi++;
+      const group=document.createElement('div');group.className='dup-group';group.setAttribute('role','listitem');
+      const hdr=document.createElement('div');hdr.className='dup-group-hdr';
+      hdr.textContent='Group '+gi+' — '+arr.length+' matching questions';
+      group.appendChild(hdr);
+      arr.forEach(q=>{
+        const row=document.createElement('button');row.type='button';row.className='dup-row';
+        row.title='Click to jump to this question in the builder';
+        const numSpan=document.createElement('span');numSpan.className='dup-row-num';
+        numSpan.textContent='Q'+(qs.indexOf(q)+1);
+        const textSpan=document.createElement('span');textSpan.className='dup-row-text';
+        const raw=q.type==='translation'?(q.sourceText||q.label):q.label;
+        textSpan.textContent=raw&&raw.trim()?raw:'(untitled)';
+        row.append(numSpan,textSpan);
+        row.addEventListener('click',()=>_jumpToDuplicateQuestion(q.id));
+        group.appendChild(row);
+      });
+      list.appendChild(group);
+    });
+  }
+  modal.style.display='flex';
+}
+function closeDuplicatesModal(){document.getElementById('duplicates-modal').style.display='none';}
+function handleDuplicatesModalOverlay(e){if(e.target===document.getElementById('duplicates-modal'))closeDuplicatesModal();}
+
+// Jumps the builder to a specific question from within the duplicate-review
+// modal: switches to the Questions tab (read-only viewers never see this
+// modal, since the header badge only renders for admins editing a form),
+// makes sure the card is actually in the DOM (virtual scroll), selects it,
+// and scrolls it into view — mirroring the existing scrollToFirstQuestion()/
+// scrollToLastQuestion() double-rAF pattern so layout has settled first.
+function _jumpToDuplicateQuestion(id){
+  closeDuplicatesModal();
+  switchTab('questions');
+  jumpToItemPage(id);
+  selectItem(id);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const card=document.getElementById('qcard-'+id);
+    if(card){
+      card.scrollIntoView({behavior:'smooth',block:'center'});
+      const li=document.getElementById('ql-'+id);
+      if(li&&!li.disabled)li.focus({preventScroll:true});
+    }
+  }));
+}
+
 function updateStats(){
   // questionCount / sectionCount are maintained as cached counters in STATE —
   // incremented on add/duplicate, decremented on delete, recomputed on undo/redo/load.
@@ -9353,6 +9579,12 @@ function updateStats(){
   _rebuildSectionJumpDropdown();
   // Refresh the persistent section breadcrumb (visibility + current-section label)
   _updateSectionBreadcrumb();
+  // Refresh duplicate-question flags (header badge + per-card badges) —
+  // see §DUPLICATES above. updateStats() already runs after every label
+  // edit, add/delete, undo/redo, import, and bank insert, so this covers
+  // every path that can change question text except the translation
+  // "source sentence" field, which calls this directly (see bindBuilderEvents).
+  _refreshDuplicateFlags();
 }
 
 // Rebuild the section-jump <select> in the builder toolbar AND the FAB.
@@ -9654,6 +9886,12 @@ function bindBuilderEvents(){
             const li=document.getElementById('ql-'+it.id);
             if(li) li.value=e.target.value;
           }
+          // The source sentence is what duplicate-detection actually compares
+          // for translation questions (see _computeDuplicateQuestionGroups),
+          // so keep the flag live here too — this path bypasses updateLabel()/
+          // updateStats(), which is where every other question type's live
+          // duplicate refresh happens.
+          _refreshDuplicateFlags();
           triggerAutoSave();
         }
       };ts.addEventListener('input',ts._h);}
@@ -10197,6 +10435,14 @@ function renderQCardNode(q,i){
   // just reuses the existing _currentSectionIdForItem() lookup.
   const _secIdForTint=_currentSectionIdForItem(q.id);
   if(_secIdForTint!=='__top__')wrap.dataset.inSection='1';
+  // Duplicate-question flag (see §DUPLICATES / _refreshDuplicateFlags()).
+  // Read from the cache computed by the last updateStats() call rather than
+  // recomputing here — recomputing per-card would make rendering a 300-item
+  // quiz O(n²). _refreshDuplicateFlags() re-syncs this immediately after
+  // every batch this function is called from (renderBuilder, virtual-scroll
+  // sentinel), so it's never more than one frame stale.
+  const _isDup=_dupQuestionIds.has(q.id);
+  if(_isDup)wrap.classList.add('has-duplicate');
 
   const dragHandle=document.createElement('div');dragHandle.className='drag-handle';dragHandle.title='Drag to reorder';dragHandle.setAttribute('aria-label','Drag to reorder');
   dragHandle.innerHTML='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="2.5" cy="8" r="1.4" fill="currentColor"/><circle cx="7.5" cy="8" r="1.4" fill="currentColor"/><circle cx="2.5" cy="13.5" r="1.4" fill="currentColor"/><circle cx="7.5" cy="13.5" r="1.4" fill="currentColor"/></svg>';
@@ -10221,6 +10467,18 @@ function renderQCardNode(q,i){
   labelInp.addEventListener('mousedown',e=>e.stopPropagation());
   const qNum=document.createElement('div');qNum.className='q-num';qNum.textContent='Q'+(i+1);
   labelWrap.append(labelInp,qNum);
+  if(_isDup){
+    const dupFlag=document.createElement('button');
+    dupFlag.type='button';dupFlag.className='dup-flag';dupFlag.textContent='⚠ Duplicate';
+    const _qsForFlag=items.filter(it=>it.kind==='question');
+    const _keyForFlag=_normalizeForDupCheck(q.type==='translation'?(q.sourceText||q.label):q.label);
+    const _groupForFlag=_dupGroupsCache.get(_keyForFlag)||[];
+    const _others=_groupForFlag.filter(x=>x.id!==q.id).map(x=>'Q'+(_qsForFlag.indexOf(x)+1));
+    dupFlag.title=_others.length?'Matches '+_others.join(', ')+' — click to review':'Matches another question — click to review';
+    dupFlag.setAttribute('aria-label',dupFlag.title);
+    dupFlag.addEventListener('click',e=>{e.stopPropagation();openDuplicatesModal();});
+    labelWrap.appendChild(dupFlag);
+  }
   const typeSelect=document.createElement('select');typeSelect.className='type-select';
   TYPES.forEach(t=>{const o=document.createElement('option');o.value=t.val;o.textContent=t.label;if(q.type===t.val)o.selected=true;typeSelect.appendChild(o);});
   typeSelect.addEventListener('change',e=>{e.stopPropagation();updateType(q.id,e.target.value);
@@ -11622,6 +11880,22 @@ function shareResults(sc,formTitle){
   td{border-bottom:1px solid #f0f0f0;vertical-align:top}
   .footer{padding:14px 32px;background:#f9f7ff;border-top:1px solid #ede9f8;font-size:11px;color:#aaa;display:flex;justify-content:space-between;align-items:center}
   .footer strong{color:${fc}}
+  /* Scroll-to-top / scroll-to-bottom nav — fixes long results (many review
+     rows) requiring several manual scrolls to reach the bottom. Hidden
+     automatically when the page is short enough not to need it, and hidden
+     from print/PDF output since it's an on-screen navigation aid only. */
+  .results-scroll-nav{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:20}
+  .results-scroll-btn{width:42px;height:42px;border-radius:50%;border:none;background:${fc};color:#fff;font-size:17px;line-height:1;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.24);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease}
+  .results-scroll-btn.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+  .results-scroll-btn:hover{filter:brightness(1.08)}
+  .results-scroll-btn:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 2px ${fc},0 3px 12px rgba(0,0,0,.24)}
+  @media (max-width:480px){
+    .results-scroll-nav{right:12px;bottom:12px}
+    .results-scroll-btn{width:38px;height:38px;font-size:15px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .results-scroll-btn{transition:none}
+  }
   @media print{
     @page{margin:12mm}
     html,body{height:auto!important;overflow:visible!important;background:#fff;padding:0}
@@ -11672,6 +11946,10 @@ function shareResults(sc,formTitle){
     <button class="no-print" onclick="printResults()" style="background:${fc};color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer">🖨 Print / Save PDF</button>
   </div>
 </div>
+<div class="results-scroll-nav no-print" id="results-scroll-nav">
+  <button type="button" class="results-scroll-btn" id="btn-scroll-top" aria-label="Jump to top of results" title="Jump to top">↑</button>
+  <button type="button" class="results-scroll-btn" id="btn-scroll-bottom" aria-label="Jump to bottom of results" title="Jump to bottom">↓</button>
+</div>
 <script>
   // Same fix as the main app's _hardenedPrint(): don't call window.print()
   // until fonts have settled and a couple of animation frames have passed,
@@ -11689,6 +11967,39 @@ function shareResults(sc,formTitle){
       go();
     }
   }
+
+  // ROOT CAUSE FIX: on quizzes with many review rows this results page can
+  // run several screens long with no way to jump around it, forcing repeated
+  // manual scrolling to reach the bottom (or back to the top). This adds a
+  // small always-available "jump to top / jump to bottom" control, hidden
+  // automatically once there's nothing left to scroll in that direction (or
+  // if the whole page already fits on one screen).
+  (function initResultsScrollNav(){
+    var topBtn=document.getElementById('btn-scroll-top');
+    var bottomBtn=document.getElementById('btn-scroll-bottom');
+    if(!topBtn||!bottomBtn)return;
+    var reduceMotion=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var behavior=reduceMotion?'auto':'smooth';
+    var EDGE=80; // px of "slack" before a direction is considered reachable/reached
+
+    function scrollableHeight(){
+      return Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
+    }
+    function updateVisibility(){
+      var maxScroll=scrollableHeight();
+      var canScroll=maxScroll>EDGE;
+      topBtn.classList.toggle('show',canScroll&&window.scrollY>EDGE);
+      bottomBtn.classList.toggle('show',canScroll&&(maxScroll-window.scrollY)>EDGE);
+    }
+    topBtn.addEventListener('click',function(){window.scrollTo({top:0,behavior:behavior});});
+    bottomBtn.addEventListener('click',function(){window.scrollTo({top:scrollableHeight(),behavior:behavior});});
+    window.addEventListener('scroll',updateVisibility,{passive:true});
+    window.addEventListener('resize',updateVisibility);
+    // Re-check after layout/fonts/images settle — mirrors printResults()'s timing.
+    updateVisibility();
+    setTimeout(updateVisibility,50);
+    setTimeout(updateVisibility,400);
+  })();
 <\/script>
 </body>
 </html>`;
@@ -13267,6 +13578,7 @@ const _MODAL_ESC_CLOSERS={
   'attempt-detail-modal':()=>closeAttemptDetailModal(),
   'import-modal':()=>closeImportModal(),
   'lib-modal':()=>closeLibModal(),
+  'duplicates-modal':()=>closeDuplicatesModal(),
 };
 
 function _trapFocus(modal){
@@ -13329,6 +13641,7 @@ function _handleTrapEscape(e){
     {id:'attempt-detail-modal',open:'openAttemptDetailModal',close:'closeAttemptDetailModal'},
     {id:'import-modal',open:'openImportModal',close:'closeImportModal'},
     {id:'lib-modal',open:'openLibModal',close:'closeLibModal'},
+    {id:'duplicates-modal',open:'openDuplicatesModal',close:'closeDuplicatesModal'},
   ];
   patches.forEach(p=>{
     const orig=window[p.open];
@@ -13383,6 +13696,29 @@ document.addEventListener('touchstart',e=>{
     if(actual===expected){passed++;return;}
     failed++;
     console.error(`[FAIL] ${desc}\n  expected: ${JSON.stringify(expected)}\n  actual:   ${JSON.stringify(actual)}`);
+  }
+
+  // §DUPLICATES tests — normalization + grouping (see the section above
+  // updateStats() for implementation).
+  assert('dup-normalize: case/whitespace-insensitive',_normalizeForDupCheck('  What Is   Your Name?  '),'what is your name');
+  assert('dup-normalize: trailing punctuation stripped',_normalizeForDupCheck('Hello world!!!'),'hello world');
+  assert('dup-normalize: empty stays empty',_normalizeForDupCheck(''),'');
+  assert('dup-normalize: null-ish stays empty',_normalizeForDupCheck(null),'');
+  {
+    const _prevItems=STATE.items;
+    items=[
+      {id:1,kind:'question',type:'text',label:'What is your name?'},
+      {id:2,kind:'question',type:'text',label:'what is your name'},
+      {id:3,kind:'question',type:'text',label:'Something else entirely'},
+      {id:4,kind:'question',type:'translation',label:'Bonjour',sourceText:'What is your name?'},
+      {id:5,kind:'section',title:'Section A'},
+    ];
+    const groups=_computeDuplicateQuestionGroups();
+    assert('dup-groups: only text/translation matches group (not the section)',groups.size,1);
+    const onlyGroup=[...groups.values()][0];
+    assert('dup-groups: group has all 3 matching questions',onlyGroup.length,3);
+    assert('dup-groups: never mutates question text',items[0].label,'What is your name?');
+    items=_prevItems;
   }
 
   const radioQ={correct:'Paris',options:['Paris','Berlin','Madrid']};
