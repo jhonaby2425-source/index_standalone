@@ -7508,7 +7508,7 @@ function _buildFormCard(f, _attByForm){
   // ── Group picker button ──────────────────────────────────────────────────────
   const grpBtn=document.createElement('button');grpBtn.className='fc-action admin-only';
   const assignedGrp=STATE.groups.find(g=>g.id===f.group);
-  grpBtn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${assignedGrp?assignedGrp.color:'#9e99b8'};margin-right:3px;flex-shrink:0"></span>${assignedGrp?'Group: '+assignedGrp.name:'+ Group'}`;
+  grpBtn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${assignedGrp?assignedGrp.color:'#9e99b8'};margin-right:3px;flex-shrink:0"></span>${assignedGrp?'Group: '+_escHtml(assignedGrp.name):'+ Group'}`;
   grpBtn.title='Move to a group';
   grpBtn.addEventListener('click',e=>{e.stopPropagation();_openGroupPicker(f.id,grpBtn);});
   const delBtn=document.createElement('button');delBtn.className='fc-action danger admin-only';delBtn.textContent='🗑 Delete';delBtn.addEventListener('click',()=>deleteForm(f.id));
