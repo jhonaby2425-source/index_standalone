@@ -699,6 +699,41 @@ body.theme-classic .dup-flag{margin-top:4px}
 }
 .sticky-sec-btn.current .sec-dot{background:#fff;opacity:1}
 .sticky-nav-rail.hidden{display:none}
+
+/* ── Results jump nav (Top/Bottom) ──────────────────────────────────────────
+   Shown only on the submitted "Answer Review" screen. Long quizzes (dozens
+   to hundreds of questions) render their review list in lazy batches (see
+   REVIEW_BATCH_SIZE / _initReviewBatch), which otherwise forces the person
+   to scroll — and wait for each batch to lazy-load — all the way down just
+   to see the final actions, or all the way back up to retry. This mirrors
+   the equivalent control already used in the standalone "Share Results"
+   popup window (see §SHARE_RESULTS), restyled to track the current quiz's
+   accent color and to hide/show based on the app's own document scroll. */
+.results-jump-nav{
+  position:fixed;right:20px;bottom:24px;z-index:150;
+  display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+}
+.results-jump-btn{
+  display:flex;align-items:center;gap:6px;min-height:38px;
+  border-radius:50px;font-size:12px;font-weight:600;font-family:inherit;
+  cursor:pointer;border:2px solid var(--form-accent,var(--purple));
+  background:var(--surface);color:var(--form-accent,var(--purple));
+  padding:8px 16px 8px 12px;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);
+  opacity:0;pointer-events:none;transform:translateY(4px);
+  transition:opacity .15s ease,transform .15s ease,background .15s ease,color .15s ease;
+}
+.results-jump-btn.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.results-jump-btn:hover{background:var(--form-accent,var(--purple));color:#fff}
+.results-jump-btn:focus-visible{outline:3px solid var(--form-accent,var(--purple));outline-offset:2px}
+.results-jump-icon{width:14px;height:14px;flex-shrink:0}
+@media (max-width:480px){
+  .results-jump-nav{right:12px;bottom:calc(16px + var(--safe-bottom))}
+  .results-jump-btn{padding:7px 14px 7px 10px;font-size:11.5px}
+}
+@media (prefers-reduced-motion: reduce){
+  .results-jump-btn{transition:none}
+}
 .preview-section-hdr{background:var(--surface);border-radius:10px;border:1.5px solid var(--border);padding:14px 20px;border-left:5px solid var(--form-accent,var(--purple))}
 .preview-section-title{font-size:17px;font-weight:600;color:var(--text);margin-bottom:3px}
 .preview-section-desc{font-size:12px;color:var(--text2)}
@@ -1239,7 +1274,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
      job, which is what was corrupting the generated "Save as PDF" file. */
   .toc-panel,#fab-goto-last,.mobile-menu,.mobile-overlay,
   .kbd-panel-overlay,.reassign-popover,.shortcut-toast,.js-retro-toast,
-  .drag-ghost{display:none!important}
+  .drag-ghost,.results-jump-nav{display:none!important}
 
   body{background:#fff!important;color:#000!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -8659,6 +8694,7 @@ function saveCurrentForm(){
 function saveAndGoBack(){
   const fab=document.getElementById('fab-goto-last');
   if(fab) fab.style.display='none';
+  _teardownResultsJumpNav();
   const breadcrumbRow=document.getElementById('section-breadcrumb-row');
   if(breadcrumbRow) breadcrumbRow.style.display='none';
   if(_breadcrumbMenuOpen) closeSectionBreadcrumbMenu();
@@ -8890,6 +8926,9 @@ function switchTab(tab){
   // Always hide the FAB when switching tabs; updateStats() will re-show it for the questions tab
   const fab=document.getElementById('fab-goto-last');
   if(fab) fab.style.display='none';
+  // Same for the results Top/Bottom nav: it only ever belongs on a
+  // just-submitted Preview results screen, never on Questions/Admin.
+  if(tab!=='preview') _teardownResultsJumpNav();
   // Same treatment for the section breadcrumb — updateStats() only re-shows it on
   // the questions branch below, so hide (and close its menu) unconditionally here.
   const breadcrumbRow=document.getElementById('section-breadcrumb-row');
@@ -11106,6 +11145,18 @@ function renderPreview(){
   const fc=(f&&f.color)||'#5c35b1';
 
   if(previewSubmitted){
+    // ROOT CAUSE FIX: renderStickyNav() is only ever called from the
+    // not-yet-submitted branch below (see the call at the end of this
+    // function), and it only removes its OWN stale element the next time
+    // IT runs. Submitting a quiz jumps straight into this branch instead,
+    // so the sticky section/progress rail from the last page the person was
+    // on (e.g. "Seccion 8 · 100%") was never torn down — it just sat there,
+    // frozen, above the results. It looked like navigation but its buttons
+    // called goToPage(), which does nothing useful once previewSubmitted is
+    // true, so clicking it never actually got anyone anywhere. Remove it
+    // unconditionally on entry to the results view.
+    const staleStickyNav=document.getElementById('sticky-preview-nav');
+    if(staleStickyNav)staleStickyNav.remove();
     const sc=previewScore||{earned:0,total:0,results:[],pct:null};
     const hasScorable=sc.results.some(r=>r.hasCorrect);
     const faN=getFormAttemptCount(currentFormId);
@@ -11253,8 +11304,12 @@ function renderPreview(){
     successCard.append(againBtn,shareBtn);
     if(histLink)successCard.appendChild(histLink);
     wrap.innerHTML='';wrap.appendChild(successCard);
+    renderResultsJumpNav();
     return;
   }
+  // Live quiz-taking view (not yet submitted) never needs the results jump
+  // nav — tear it down so it can't linger from a just-cleared/prior attempt.
+  _teardownResultsJumpNav();
 
   const hmp=previewPages.length>1;
   const previewList=previewPages.flat();
@@ -11446,6 +11501,92 @@ function updateStickyNav(){
     if(pageIdx<0)return;
     btn.className='sticky-sec-btn'+(isPageAnswered(pageIdx)?' done':'');
   });
+}
+
+// ── Results jump nav (Top/Bottom) ───────────────────────────────────────────
+// See the matching CSS comment. _resultsJumpNavCleanup holds the teardown
+// closure (removes the scroll/resize listeners + pending timers) for
+// whichever instance is currently mounted, mirroring how _reviewBatchState
+// tracks its own IntersectionObserver so re-renders never leak listeners.
+let _resultsJumpNavCleanup=null;
+
+function _teardownResultsJumpNav(){
+  const old=document.getElementById('results-jump-nav');
+  if(old)old.remove();
+  if(_resultsJumpNavCleanup){_resultsJumpNavCleanup();_resultsJumpNavCleanup=null;}
+}
+
+function renderResultsJumpNav(){
+  _teardownResultsJumpNav();
+
+  const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const behavior=reduceMotion?'auto':'smooth';
+  const EDGE=80; // px of slack before a direction is considered reachable/reached
+
+  const nav=document.createElement('div');
+  nav.id='results-jump-nav';
+  nav.className='results-jump-nav';
+
+  // Color comes from the --form-accent custom property (already kept in
+  // sync with the quiz's chosen color on document.documentElement — see
+  // applyTheme()/openForm()) via the stylesheet rules, not inline styles:
+  // an inline `color`/`background` would out-rank the stylesheet's :hover
+  // rule and the buttons would never visibly react to hover/focus.
+  const topBtn=document.createElement('button');
+  topBtn.type='button';topBtn.id='results-jump-top';topBtn.className='results-jump-btn';
+  topBtn.setAttribute('aria-label','Jump to top of results');
+  topBtn.title='Jump to top';
+  topBtn.innerHTML='<svg class="results-jump-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg><span>Top</span>';
+
+  const bottomBtn=document.createElement('button');
+  bottomBtn.type='button';bottomBtn.id='results-jump-bottom';bottomBtn.className='results-jump-btn';
+  bottomBtn.setAttribute('aria-label','Jump to bottom of results');
+  bottomBtn.title='Jump to bottom';
+  bottomBtn.innerHTML='<svg class="results-jump-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg><span>Bottom</span>';
+
+  nav.append(topBtn,bottomBtn);
+  document.body.appendChild(nav);
+
+  function scrollableHeight(){
+    return Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
+  }
+  function updateVisibility(){
+    const maxScroll=scrollableHeight();
+    const canScroll=maxScroll>EDGE;
+    topBtn.classList.toggle('show',canScroll&&window.scrollY>EDGE);
+    bottomBtn.classList.toggle('show',canScroll&&(maxScroll-window.scrollY)>EDGE);
+  }
+  function onTop(){window.scrollTo({top:0,behavior:behavior});}
+  function onBottom(){
+    // Force any still-lazy-loaded review batches to render first (see
+    // REVIEW_BATCH_SIZE / _reviewEnsureRendered) so "Bottom" always lands
+    // past the very last review card and the actions below it (Submit
+    // Another Response / Share Results), instead of stopping short at
+    // whatever has loaded so far or landing on the empty loading sentinel.
+    if(_reviewBatchState)_reviewEnsureRendered(_reviewBatchState.results.length-1);
+    // Double rAF: give the browser two frames to commit the newly-rendered
+    // batch to layout before measuring scrollHeight, same fix already used
+    // by scrollToLastQuestion()/scrollToFirstQuestion() for the same reason.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      window.scrollTo({top:scrollableHeight(),behavior:behavior});
+      updateVisibility();
+    }));
+  }
+  topBtn.addEventListener('click',onTop);
+  bottomBtn.addEventListener('click',onBottom);
+  window.addEventListener('scroll',updateVisibility,{passive:true});
+  window.addEventListener('resize',updateVisibility);
+  updateVisibility();
+  // Re-check shortly after mount: lazy-rendered review cards and the
+  // missed-questions summary can still be settling layout right after paint.
+  const t1=setTimeout(updateVisibility,50);
+  const t2=setTimeout(updateVisibility,400);
+
+  _resultsJumpNavCleanup=function(){
+    window.removeEventListener('scroll',updateVisibility);
+    window.removeEventListener('resize',updateVisibility);
+    clearTimeout(t1);clearTimeout(t2);
+  };
 }
 
 function nextPage(){const qs=getQuestionsOnPage(currentPage);if(qs.some(q=>q.required&&isBlank(q.id))){setState({previewValidation:true});renderPreview();return;}setState({previewValidation:false});goToPage(currentPage+1);}
