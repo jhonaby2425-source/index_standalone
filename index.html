@@ -3837,7 +3837,7 @@ try{
           <div class="qsearch-row">
             <div class="qsearch-box">
               <svg class="qsearch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input class="qsearch-input" id="qsearch-input" type="search" placeholder="Find in this quiz… (question text, answers, options — searches every section)" oninput="renderQSearchResults(this.value)" onkeydown="qSearchKeydown(event)" aria-label="Search this quiz">
+              <input class="qsearch-input" id="qsearch-input" type="search" placeholder="Find in this quiz… (question text, answers, options — searches every section)" oninput="_qSearchDebounced(this.value)" onkeydown="qSearchKeydown(event)" aria-label="Search this quiz">
               <span class="qsearch-count" id="qsearch-count"></span>
               <button class="qsearch-clear" id="qsearch-clear" style="display:none" onclick="clearQSearch()" aria-label="Clear search" title="Clear search">×</button>
             </div>
@@ -6165,24 +6165,122 @@ async function _driveFindOrCreateFileAndHydrate(){
   _driveLastSyncedAt=new Date();
 }
 
-// Replaces local IndexedDB contents wholesale with what's in the Drive
-// payload, then reloads runtime state and re-renders. Preview drafts
-// (STORE_DRAFTS) are intentionally left alone — they're per-browser
-// scratch state, not part of the synced library.
+// ── §SYNC-SAFETY — multi-device merge (replaces the old "Drive wins" overwrite) ──
+// ROOT CAUSE of the lost Spanish Beginner II attempt: every page load / reconnect
+// / "Refresh from Drive" used to wipe the local forms, questions AND attempts and
+// replace them with whatever Drive held. Anything recorded on this device but not
+// yet pushed (or never pushed because sync was stuck in a conflict state with no
+// handler) vanished on the next load. Now every pull is a MERGE:
+//   • attempts  — union by id; if both sides have one, the newer `updatedAt` wins
+//   • forms     — union by id; newer `updatedAt` wins, and its questions travel with it
+//   • groups    — union by id, local wins
+//   • deletions — honoured through tombstones (ids), so a deleted item does not
+//                 come back from the other device. Tombstones sync in the payload.
+// Nothing recorded on only one device can be dropped by a pull any more.
+const _TOMB_LS_KEY='qb_tombstones_v1';
+let _builderDirty=false;
+function _tombLoad(){
+  try{
+    const o=JSON.parse(localStorage.getItem(_TOMB_LS_KEY)||'{}')||{};
+    const arr=k=>Array.isArray(o[k])?o[k]:[];
+    return{attempts:arr('attempts'),forms:arr('forms'),groups:arr('groups')};
+  }catch(_){return{attempts:[],forms:[],groups:[]};}
+}
+function _tombSave(t){try{localStorage.setItem(_TOMB_LS_KEY,JSON.stringify(t));}catch(_){}}
+function _tombAdd(kind,ids){
+  const t=_tombLoad();const s=new Set(t[kind]);
+  (Array.isArray(ids)?ids:[ids]).forEach(i=>{if(i!=null)s.add(i);});
+  t[kind]=Array.from(s);_tombSave(t);
+}
+function _tombRemove(kind,ids){
+  const t=_tombLoad();const rm=new Set(Array.isArray(ids)?ids:[ids]);
+  t[kind]=t[kind].filter(i=>!rm.has(i));_tombSave(t);
+}
+function _ts(x){return Number(x&&x.updatedAt)||0;}
+
+// Pure merge of a Drive payload with what is stored locally. Returns the merged
+// library plus `localAhead` (true when this device holds something Drive lacks,
+// so the caller knows to push the merged result back).
+async function _driveMergeWithLocal(payload){
+  const arr=x=>Array.isArray(x)?x:[];
+  const [lForms,lAttempts,lQuestions]=await Promise.all([
+    dbGetAll(STORE_FORMS),dbGetAll(STORE_ATTEMPTS),dbGetAll(STORE_QUESTIONS)]);
+  const lt=_tombLoad(),rd=(payload&&payload.deleted)||{};
+  const tomb={
+    attempts:Array.from(new Set([...lt.attempts,...arr(rd.attempts)])),
+    forms:Array.from(new Set([...lt.forms,...arr(rd.forms)])),
+    groups:Array.from(new Set([...lt.groups,...arr(rd.groups)])),
+  };
+  const tA=new Set(tomb.attempts),tF=new Set(tomb.forms),tG=new Set(tomb.groups);
+  let localAhead=
+    lt.attempts.some(i=>!arr(rd.attempts).includes(i))||
+    lt.forms.some(i=>!arr(rd.forms).includes(i))||
+    lt.groups.some(i=>!arr(rd.groups).includes(i));
+
+  // forms (+ which side's questions to keep)
+  const formMap=new Map(),winner=new Map();
+  arr(payload.forms).forEach(f=>{if(f&&f.id!=null&&!tF.has(f.id)){formMap.set(f.id,f);winner.set(f.id,'remote');}});
+  arr(lForms).forEach(f=>{
+    if(!f||f.id==null||tF.has(f.id))return;
+    const r=formMap.get(f.id);
+    if(!r){formMap.set(f.id,f);winner.set(f.id,'local');localAhead=true;}
+    else if(_ts(f)>_ts(r)){formMap.set(f.id,f);winner.set(f.id,'local');localAhead=true;}
+    else if(_ts(f)===_ts(r)&&JSON.stringify(f)!==JSON.stringify(r)){formMap.set(f.id,f);winner.set(f.id,'local');localAhead=true;}
+  });
+  const qL=new Map(arr(lQuestions).map(r=>[r.formId,r])),qR=new Map(arr(payload.questions).map(r=>[r.formId,r]));
+  const questions=[];
+  formMap.forEach((f,id)=>{
+    const first=winner.get(id)==='local'?qL:qR,second=winner.get(id)==='local'?qR:qL;
+    const rec=first.get(id)||second.get(id);
+    if(rec)questions.push(rec);
+  });
+
+  // attempts
+  const att=new Map();
+  const put=(a,isLocal)=>{
+    if(!a||a.id==null||tA.has(a.id))return;
+    const cur=att.get(a.id);
+    if(!cur){att.set(a.id,a);if(isLocal)localAhead=true;return;}
+    if(_ts(a)>_ts(cur)||(isLocal&&_ts(a)===_ts(cur)&&JSON.stringify(a)!==JSON.stringify(cur))){att.set(a.id,a);if(isLocal)localAhead=true;}
+  };
+  arr(payload.attempts).forEach(a=>put(a,false));
+  arr(lAttempts).forEach(a=>put(a,true));
+  const attempts=Array.from(att.values()).sort((x,y)=>x.id-y.id); // same order IndexedDB returns on reload
+
+  // groups
+  const gMap=new Map();
+  arr(payload.groups).forEach(g=>{if(g&&g.id!=null&&!tG.has(g.id))gMap.set(g.id,g);});
+  _loadGroups().forEach(g=>{
+    if(!g||g.id==null||tG.has(g.id))return;
+    if(!gMap.has(g.id))localAhead=true;
+    gMap.set(g.id,g);
+  });
+
+  return{forms:Array.from(formMap.values()),attempts,questions,groups:Array.from(gMap.values()),tomb,localAhead};
+}
+
+// Pulls the Drive payload into local storage by MERGING (see §SYNC-SAFETY).
+// Non-admin accounts keep the old read-only behaviour for the shared library
+// (their own attempts live in a separate private file and are never replaced).
+// Preview drafts (STORE_DRAFTS) are intentionally left alone — per-browser state.
 async function _driveHydrateFromPayload(payload,opts){
   if(!payload||typeof payload!=='object')return;
-  // skipAttempts=true is used when a non-admin ("test mode") account hydrates
-  // from the shared library file: that file's `attempts` array is the
-  // ADMIN's own attempt history, not this account's. Non-admins keep their
-  // local attempts untouched here — their own history now lives in a
-  // separate private Drive file instead (see DRIVE_VIEWER_ATTEMPTS_FILE_NAME).
   const skipAttempts=!!(opts&&opts.skipAttempts);
+  let pushBack=false;
   _driveHydrating=true;
   try{
-    const formsArr=Array.isArray(payload.forms)?payload.forms:[];
-    const attemptsArr=skipAttempts?attempts:(Array.isArray(payload.attempts)?payload.attempts:[]);
-    const questionsArr=Array.isArray(payload.questions)?payload.questions:[];
-    const groupsArr=Array.isArray(payload.groups)?payload.groups:[];
+    let formsArr,attemptsArr,questionsArr,groupsArr;
+    if(skipAttempts){
+      formsArr=Array.isArray(payload.forms)?payload.forms:[];
+      attemptsArr=attempts;
+      questionsArr=Array.isArray(payload.questions)?payload.questions:[];
+      groupsArr=Array.isArray(payload.groups)?payload.groups:[];
+    } else {
+      const m=await _driveMergeWithLocal(payload);
+      formsArr=m.forms;attemptsArr=m.attempts;questionsArr=m.questions;groupsArr=m.groups;
+      _tombSave(m.tomb);
+      pushBack=m.localAhead;
+    }
     await _dbPutAllRaw(STORE_FORMS,formsArr);
     if(!skipAttempts) await _dbPutAllRaw(STORE_ATTEMPTS,attemptsArr);
     await _dbPutAllRaw(STORE_QUESTIONS,questionsArr);
@@ -6198,7 +6296,52 @@ async function _driveHydrateFromPayload(payload,opts){
   } finally {
     _driveHydrating=false;
   }
+  // This device had something Drive did not — send the merged result back so
+  // every other device receives it too.
+  if(pushBack) scheduleDriveSync();
 }
+
+// Reload the open builder only if another device's version of THIS form won the
+// merge and there are no unsaved local edits pending.
+async function _reloadBuilderIfStale(){
+  try{
+    const bv=document.getElementById('builder-view');
+    if(!bv||bv.style.display!=='block'||STATE.currentFormId==null||_builderDirty)return;
+    const stored=await loadQuestions(STATE.currentFormId);
+    if(JSON.stringify(stored)!==JSON.stringify(items)){
+      if(_isAdmin)await openForm(STATE.currentFormId);else await testForm(STATE.currentFormId);
+    }
+  }catch(e){console.warn('[drive] builder reload after merge failed:',e);}
+}
+
+// A sync conflict means another device changed the library since we last
+// looked. The old code raised 'drive-sync-conflict' but NOTHING listened, so
+// every later push failed silently for the rest of the session and the next
+// load then overwrote local work. Now we merge the remote version in, mark the
+// remote version as seen, and push the combined result — no prompt, no loss.
+let _driveConflictResolving=false;
+async function _driveResolveConflictByMerge(){
+  if(_driveConflictResolving||!_driveConnected||!_isAdmin)return;
+  const fileId=_driveFileId||DRIVE_SHARED_FILE_ID;
+  if(!fileId)return;
+  _driveConflictResolving=true;
+  try{
+    _driveSetStatus('syncing','Another device changed the library — merging…');
+    const meta=await _driveGetFileMeta(fileId);
+    const payload=await _driveDownloadFile(fileId);
+    await _driveHydrateFromPayload(payload,{skipAttempts:false});
+    _driveKnownModifiedTime=(meta&&meta.modifiedTime)||_driveKnownModifiedTime;
+    _driveConflictPending=false;
+    await _reloadBuilderIfStale();
+    scheduleDriveSync(true);
+  }catch(e){
+    console.warn('[drive] conflict auto-merge failed:',e);
+    _driveSetStatus('err','Could not merge changes from another device — your local data is untouched. ('+e.message+')');
+  }finally{
+    _driveConflictResolving=false;
+  }
+}
+document.addEventListener('drive-sync-conflict',()=>{_driveResolveConflictByMerge();});
 
 // Manual "Refresh from Drive" — re-downloads the current library file on
 // demand and replaces the local copy, instead of waiting for the next
@@ -6210,7 +6353,7 @@ async function _driveRefreshFromDrive(){
   if(!_driveConnected){showShortcutToast('Connect Google Drive first');return;}
   const fileId=(!_isAdmin&&DRIVE_SHARED_FILE_ID)?DRIVE_SHARED_FILE_ID:_driveFileId;
   if(!fileId){showShortcutToast('No Drive file to refresh from yet');return;}
-  if(!confirm('This replaces your local copy with the version currently saved in Drive. Any change made in the last few seconds that has not synced yet could be overwritten. Continue?'))return;
+  if(!confirm('This pulls the latest changes from Drive and merges them with this device. Nothing recorded only on this device is discarded. Continue?'))return;
   _driveSetStatus('syncing','Refreshing from Drive…');
   try{
     const meta=await _driveGetFileMeta(fileId);
@@ -6248,6 +6391,7 @@ async function buildLibraryPayload(){
     attempts:JSON.parse(JSON.stringify(attempts)),
     groups:JSON.parse(JSON.stringify(STATE.groups)),
     revokedEmails:Array.isArray(_revokedEmails)?[..._revokedEmails]:[],
+    deleted:_tombLoad(),
   };
 }
 
@@ -6593,6 +6737,7 @@ function triggerAutoSave(){
   const stripText=document.getElementById('strip-save-text');
   if(stripDot)stripDot.className='status-strip-dot saving';
   if(stripText)stripText.textContent='Saving…';
+  _builderDirty=true;
   clearTimeout(autoSaveTimer);
   setState({autoSaveTimer:setTimeout(()=>{
     saveCurrentForm();
@@ -6600,6 +6745,7 @@ function triggerAutoSave(){
     if(currentFormId) markFormDirty(currentFormId);
     persistFormById();
     persistQuestions();
+    _builderDirty=false;
     if(dot)dot.className='autosave-dot saved';
     if(stripDot)stripDot.className='status-strip-dot saved';
     if(stripText)stripText.textContent='Saved';
@@ -6642,35 +6788,36 @@ function retrogradeScoreAttempts(formId, opts, questionsOverride){
   const currentQuestions=questionsOverride||items.filter(it=>it.kind==='question');
   if(!currentQuestions.length)return;
   let rescored=0,skipped=0;
+  // PERF + SYNC SAFETY: only attempts whose numbers actually changed are
+  // modified, stamped (updatedAt, so multi-device merges pick the newest
+  // copy) and written back. Previously every attempt of the form was
+  // rewritten on every answer-key edit, which is what made editing laggy.
+  const changed=[];
   formAttempts.forEach(attempt=>{
     if(attempt.answers&&typeof attempt.answers==='object'){
       const oldScore=attempt.score;
-      const newResult=rescoreOneAttempt(attempt.answers,currentQuestions);
-      attempt.score=newResult.pct;
-      attempt.earned=newResult.earned;
-      attempt.total=newResult.total;
-      attempt.correct=newResult.correct;
-      attempt.wrong=newResult.wrong;
-      attempt.hasScorable=newResult.hasScorable;
-      attempt.rescored=true;
-      if(oldScore!==newResult.pct)rescored++;
+      const r=rescoreOneAttempt(attempt.answers,currentQuestions);
+      const same=attempt.score===r.pct&&attempt.earned===r.earned&&attempt.total===r.total&&
+        attempt.correct===r.correct&&attempt.wrong===r.wrong&&attempt.hasScorable===r.hasScorable;
+      if(same)return;
+      attempt.score=r.pct;attempt.earned=r.earned;attempt.total=r.total;
+      attempt.correct=r.correct;attempt.wrong=r.wrong;attempt.hasScorable=r.hasScorable;
+      attempt.rescored=true;attempt.updatedAt=Date.now();
+      changed.push(attempt);
+      if(oldScore!==r.pct)rescored++;
     } else {
-      attempt.cannotRescore=true;
+      if(!attempt.cannotRescore){attempt.cannotRescore=true;attempt.updatedAt=Date.now();changed.push(attempt);}
       skipped++;
     }
   });
   // Upsert only the records we actually changed — never clear the whole store.
-  // This prevents a race condition where a concurrent session's attempts (not
-  // loaded into this tab's memory) would be wiped by the old persistAttempts()
-  // clear+rewrite pattern.
-  formAttempts.forEach(a=>{
+  changed.forEach(a=>{
     _persistWithRetry(()=>dbPutOne(STORE_ATTEMPTS,a), {
       label:'retrogradeScoreAttempts dbPutOne',
       failMsg:'Could not save a rescored attempt — try Rescore again.'
     });
   });
-  updateAttemptsCounts();
-  renderDashboard();
+  if(changed.length){updateAttemptsCounts();renderDashboard();}
   if(rescored>0||skipped>0||opts.force)showRetroToast(rescored,skipped);
 }
 
@@ -6995,12 +7142,13 @@ function renderAttemptsModal(){
 }
 function filterAttempts(v){setState({attemptsFilter:v});renderAttemptsModal();}
 function deleteAttempt(id){
+  _tombAdd('attempts',id);
   setState({attempts:attempts.filter(a=>a.id!==id)});
   // Use targeted delete — never clear+rewrite the whole store.
   dbDeleteOne(STORE_ATTEMPTS,id).catch(e=>console.warn('deleteAttempt dbDeleteOne:',e));
   updateAttemptsCounts();renderAttemptsModal();renderDashboard();
 }
-async function clearAllAttempts(){if(!await _confirmModal('Clear all attempt history?\n\nThis cannot be undone.','Clear All','Cancel'))return;setState({attempts:[]});persistAttempts();updateAttemptsCounts();renderAttemptsModal();renderDashboard();}
+async function clearAllAttempts(){if(!await _confirmModal('Clear all attempt history?\n\nThis cannot be undone.','Clear All','Cancel'))return;_tombAdd('attempts',attempts.map(a=>a.id));setState({attempts:[]});persistAttempts();updateAttemptsCounts();renderAttemptsModal();renderDashboard();}
 
 // BUG FIX 1: reassignAttempt — route all mutation through setState() instead of
 // directly mutating the attempt object in-place.
@@ -7008,7 +7156,7 @@ function reassignAttempt(attemptId,newFormId){
   const a=attempts.find(x=>x.id===attemptId);
   const f=forms.find(x=>x.id===newFormId);
   if(!a||!f)return;
-  const updated={...a,formId:newFormId,formTitle:f.title,formColor:f.color||'#5c35b1'};
+  const updated={...a,formId:newFormId,formTitle:f.title,formColor:f.color||'#5c35b1',updatedAt:Date.now()};
   // Replace the attempt record immutably via setState so the change is
   // traceable and consistent with how the rest of the app mutates STATE.
   setState({
@@ -7314,6 +7462,7 @@ function _recolorGroup(id, color){
 function _deleteGroup(id){
   // Navigate back to root if this group was open
   if(_folderViewId===id) _folderViewId=null;
+  _tombAdd('groups',id);
   STATE.groups = STATE.groups.filter(g => g.id!==id);
   _saveGroups(STATE.groups);
   // Un-assign forms that were in this group
@@ -8774,7 +8923,7 @@ function testForm(id){
   const goToPreview=()=>{ return _isAdmin ? switchTab('preview') : Promise.resolve(); };
   return openForm(id).then(goToPreview).catch(goToPreview);
 }
-async function deleteForm(id){if(!_isAdmin){showShortcutToast('Only the admin can delete forms.');return;}if(!await _confirmModal('Delete this form?\n\nAll questions will be permanently removed.','Delete','Cancel'))return;setState({forms:forms.filter(x=>x.id!==id)});deleteQuestions(id);dbDeleteOne(STORE_FORMS,id).catch(()=>{});renderDashboard();}
+async function deleteForm(id){if(!_isAdmin){showShortcutToast('Only the admin can delete forms.');return;}if(!await _confirmModal('Delete this form?\n\nAll questions will be permanently removed.','Delete','Cancel'))return;_tombAdd('forms',id);setState({forms:forms.filter(x=>x.id!==id)});deleteQuestions(id);dbDeleteOne(STORE_FORMS,id).catch(()=>{});renderDashboard();}
 function syncTitle(){
   const t=document.getElementById('form-title').value;
   const f=forms.find(x=>x.id===currentFormId);
@@ -9378,6 +9527,10 @@ function renderQSearchResults(raw){
   });
   box.style.display='block';
 }
+// PERF: the search box used to rescan every item on every keystroke. Debounced
+// so a burst of typing costs one scan. Enter/clear flush or cancel it so they
+// never act on a stale result list.
+const _qSearchDebounced=_debounce(v=>renderQSearchResults(v),150);
 function goToQSearchResult(id){
   jumpToItemPage(id);
   const box=document.getElementById('qsearch-results');if(box)box.style.display='none';
@@ -9395,11 +9548,13 @@ function qSearchKeydown(e){
   if(e.key==='Escape'){clearQSearch();e.target.blur();return;}
   if(e.key==='Enter'){
     e.preventDefault();
+    _qSearchDebounced.cancel();renderQSearchResults(e.target.value);
     const first=box&&box.querySelector('.qsearch-result');
     if(first)first.dispatchEvent(new MouseEvent('mousedown'));
   }
 }
 function clearQSearch(){
+  _qSearchDebounced.cancel();
   const inp=document.getElementById('qsearch-input');if(inp)inp.value='';
   renderQSearchResults('');
   if(inp)inp.focus();
@@ -13382,6 +13537,7 @@ async function _processShareImport(file, statusEl){
       }
       const existingAttIds=new Set(attempts.map(a=>a.id));
       const newAttempts=(data.attempts||[]).filter(a=>!existingAttIds.has(a.id));
+      _tombRemove('attempts',newAttempts.map(a=>a.id));_tombRemove('forms',newForms.map(f=>f.id));
       setState({forms:[...forms,...newForms],attempts:[...attempts,...newAttempts]});
       await dbPutAll(STORE_FORMS,forms);await dbPutAll(STORE_ATTEMPTS,attempts);
       updateAttemptsCounts();renderDashboard();
@@ -13614,6 +13770,10 @@ async function confirmLibImport(){
       }
       const newForms=data.forms||[];
       const newAttempts=data.attempts||[];
+      { const keepA=new Set(newAttempts.map(a=>a.id)),keepF=new Set(newForms.map(f=>f.id));
+        _tombAdd('attempts',attempts.map(a=>a.id).filter(i=>!keepA.has(i)));
+        _tombAdd('forms',forms.map(f=>f.id).filter(i=>!keepF.has(i)));
+        _tombRemove('attempts',[...keepA]);_tombRemove('forms',[...keepF]); }
       setState({forms:newForms,attempts:newAttempts});
       for(const qRec of (data.questions||[])){
         try{
@@ -13642,6 +13802,7 @@ async function confirmLibImport(){
           }catch(e){ failedWrites++; }
         }
       }
+      _tombRemove('attempts',newAttempts.map(a=>a.id));_tombRemove('forms',newForms.map(f=>f.id));
       setState({forms:[...forms,...newForms],attempts:[...attempts,...newAttempts]});
       await dbPutAll(STORE_FORMS,forms);
       await dbPutAll(STORE_ATTEMPTS,attempts);
@@ -14010,3 +14171,6 @@ document.addEventListener('touchstart',e=>{
 </script>
 </body>
 </html>
+</pre>
+        </body>
+    </html>
