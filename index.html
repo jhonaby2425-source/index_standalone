@@ -3314,6 +3314,55 @@ body.theme-classic .js-label-wrap .q-label-input{width:100%}
      that stylesheet fails to apply. */
   .p-spoiler, .empty-state { display: none !important; }
 </style>
+<style id="qb-shell-controls">
+/* ── §SHELL-CONTROLS: collapsible sidebar + exam Focus mode ───────────────── */
+.shell-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-family:inherit;
+  background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;
+  padding:6px 9px;font-size:12.5px;font-weight:600;line-height:1;transition:background .15s,border-color .15s}
+.shell-btn:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.55)}
+.shell-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.shell-btn svg{width:16px;height:16px;flex-shrink:0}
+body.theme-classic .shell-btn{background:var(--surface3);border-color:var(--border);color:var(--text2)}
+body.theme-classic .shell-btn:hover{background:var(--surface2);border-color:var(--border-strong)}
+body.theme-classic .shell-btn:focus-visible{outline-color:var(--purple)}
+
+/* Sidebar collapse toggle (desktop; under 900px the sidebar is already a drawer behind the hamburger) */
+#sidebar-toggle-btn{margin-right:var(--sp-2)}
+@media (max-width:900px){#sidebar-toggle-btn{display:none}}
+.app{transition:grid-template-columns .22s var(--ease)}
+@media (min-width:901px){
+  html body.qb-sb-collapsed{--sidebar-w:0px}
+  html body.qb-sb-collapsed .sidebar{
+    visibility:hidden;overflow:hidden;min-width:0;padding-left:0;padding-right:0;border-right-width:0;
+    transition:visibility 0s linear .22s;
+  }
+}
+
+/* Focus button in the tab row: only while the exam (Preview) is showing */
+#focus-toggle-btn{display:none;align-self:center;margin-left:var(--sp-3)}
+html body.qb-in-preview #focus-toggle-btn{display:inline-flex}
+
+/* Focus mode: hide the app chrome and give the exam the room */
+.focus-exit-group{display:none;position:fixed;top:8px;left:8px;z-index:400;gap:6px;opacity:.6;transition:opacity .15s}
+.focus-exit-group:hover,.focus-exit-group:focus-within{opacity:1}
+.focus-exit-group .shell-btn{background:var(--surface);border:1.5px solid var(--border-strong);color:var(--text);
+  box-shadow:var(--shadow-sm);padding:7px 11px}
+.focus-exit-group .shell-btn:hover{background:var(--surface2)}
+.focus-exit-group .shell-btn:focus-visible{outline-color:var(--purple)}
+.focus-exit-group .shell-btn[hidden]{display:none}
+html body.qb-focus .focus-exit-group{display:flex}
+html body.qb-focus{--topbar-h:0px;--sidebar-w:0px}
+html body.qb-focus .app{grid-template-columns:minmax(0,1fr)}
+html body.qb-focus .sidebar,
+html body.qb-focus .topbar,
+html body.qb-focus .builder-status-strip{display:none!important}
+html body.qb-focus .preview-wrap{max-width:min(960px,100%);padding-top:44px}
+html body.qb-focus .sticky-nav-rail{top:0}
+@media (max-width:700px){
+  html body.qb-focus .sticky-nav-rail{padding-left:46px}
+}
+@media print{#sidebar-toggle-btn,#focus-toggle-btn,.focus-exit-group{display:none!important}}
+</style>
 </head>
 <body>
 <script>
@@ -3392,6 +3441,15 @@ try{
   }, 6000);
 })();
 </script>
+<div class="focus-exit-group" id="focus-exit-group">
+  <button type="button" class="shell-btn" id="focus-exit-btn" onclick="toggleFocusMode(false)" title="Exit focus mode (Esc)" aria-label="Exit focus mode">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    <span>Exit focus</span>
+  </button>
+  <button type="button" class="shell-btn" id="focus-fullscreen-btn" onclick="toggleBrowserFullscreen()" title="Toggle full screen" aria-label="Toggle full screen" aria-pressed="false" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/></svg>
+  </button>
+</div>
 <div class="app">
   <aside class="sidebar" id="app-sidebar" aria-label="Workspace navigation">
     <div class="sidebar-brand">
@@ -3464,6 +3522,9 @@ try{
   <div class="shell-main" id="shell-main">
   <div class="topbar" id="topbar">
     <div class="topbar-left">
+      <button type="button" class="shell-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="app-sidebar" aria-expanded="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+      </button>
       <div class="topbar-logo">
         <svg viewBox="0 0 24 24" fill="#fff"><rect x="3" y="3" width="18" height="18" rx="2.5" fill="rgba(255,255,255,.2)"/><rect x="6" y="7" width="12" height="2" rx="1" fill="#fff"/><rect x="6" y="11" width="12" height="2" rx="1" fill="#fff"/><rect x="6" y="15" width="8" height="2" rx="1" fill="#fff"/></svg>
       </div>
@@ -3476,6 +3537,10 @@ try{
     <div class="topbar-tabs" id="topbar-tabs" style="display:none">
       <button class="tab-btn active admin-only" id="tab-questions" onclick="switchTab('questions')">Questions</button>
       <button class="tab-btn" id="tab-preview" onclick="switchTab('preview')">Preview</button>
+      <button type="button" class="shell-btn" id="focus-toggle-btn" onclick="toggleFocusMode()" title="Focus mode: hide the menus and maximize the exam" aria-label="Focus mode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        <span>Focus</span>
+      </button>
     </div>
     <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu()" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -6958,6 +7023,85 @@ function _mobileMenuKeydown(e){
     if(sb.classList.contains('mobile-open'))closeMobileMenu();
   });
 })();
+// §SHELL-CONTROLS ─────────────────────────────────────────────────────────────
+// 1) Sidebar collapse (desktop): frees the full width. Remembered per browser.
+// 2) Focus mode: while the exam (Preview tab) is showing, hide the sidebar,
+//    top bar and status strip and widen the exam. The choice is remembered, so
+//    if you like it on, every exam you open starts maximized; leaving the exam
+//    always returns the normal UI. Esc or the "Exit focus" pill turns it off.
+//    Optional true browser full-screen is offered from the same pill.
+const _LS_SB_COLLAPSED='qb_sidebar_collapsed',_LS_FOCUS_PREF='qb_focus_pref';
+function _shellLsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
+function _shellLsSet(k,v){try{localStorage.setItem(k,v);}catch(_){}}
+
+function setSidebarCollapsed(on,persist){
+  document.body.classList.toggle('qb-sb-collapsed',!!on);
+  const b=document.getElementById('sidebar-toggle-btn');
+  if(b){
+    const label=on?'Show sidebar':'Hide sidebar';
+    b.title=label;b.setAttribute('aria-label',label);b.setAttribute('aria-expanded',on?'false':'true');
+  }
+  if(persist!==false)_shellLsSet(_LS_SB_COLLAPSED,on?'1':'0');
+}
+function toggleSidebar(){setSidebarCollapsed(!document.body.classList.contains('qb-sb-collapsed'));}
+
+let _focusPref=_shellLsGet(_LS_FOCUS_PREF)==='1';
+function _isExamShowing(){
+  const bv=document.getElementById('builder-view'),pv=document.getElementById('preview-tab');
+  return !!currentFormId&&!!bv&&bv.style.display!=='none'&&!!pv&&pv.style.display==='block';
+}
+function _applyFocusState(){
+  const exam=_isExamShowing();
+  document.body.classList.toggle('qb-in-preview',exam);
+  const on=exam&&_focusPref;
+  const was=document.body.classList.contains('qb-focus');
+  document.body.classList.toggle('qb-focus',on);
+  const fsb=document.getElementById('focus-fullscreen-btn');
+  if(fsb)fsb.hidden=!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);
+  if(was&&!on)_exitBrowserFullscreen();
+  const tb=document.getElementById('focus-toggle-btn');
+  if(tb){tb.title=on?'Exit focus mode (Esc)':'Focus mode: hide the menus and maximize the exam';}
+}
+function toggleFocusMode(force){
+  _focusPref=(typeof force==='boolean')?force:!_focusPref;
+  _shellLsSet(_LS_FOCUS_PREF,_focusPref?'1':'0');
+  _applyFocusState();
+}
+function _exitBrowserFullscreen(){
+  try{
+    if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+    else if(document.webkitFullscreenElement&&document.webkitExitFullscreen)document.webkitExitFullscreen();
+  }catch(_){}
+}
+function toggleBrowserFullscreen(){
+  const el=document.documentElement;
+  try{
+    if(document.fullscreenElement||document.webkitFullscreenElement){_exitBrowserFullscreen();return;}
+    const req=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(req){const r=req.call(el);if(r&&r.catch)r.catch(()=>{});}
+  }catch(_){}
+}
+function _syncFullscreenBtn(){
+  const b=document.getElementById('focus-fullscreen-btn');
+  if(b)b.setAttribute('aria-pressed',(document.fullscreenElement||document.webkitFullscreenElement)?'true':'false');
+}
+document.addEventListener('fullscreenchange',_syncFullscreenBtn);
+document.addEventListener('webkitfullscreenchange',_syncFullscreenBtn);
+// Esc leaves focus mode, unless something else (a modal, the mobile menu) already handled it.
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'||e.defaultPrevented)return;
+  if(!document.body.classList.contains('qb-focus'))return;
+  if(typeof _mobileMenuOpen!=='undefined'&&_mobileMenuOpen)return;
+  toggleFocusMode(false);
+});
+(function _initShellControls(){
+  setSidebarCollapsed(_shellLsGet(_LS_SB_COLLAPSED)==='1',false);
+  // Follow the app's own tab/view changes instead of patching every navigation function.
+  const watch=id=>{const el=document.getElementById(id);if(el)new MutationObserver(_applyFocusState).observe(el,{attributes:true,attributeFilter:['style']});};
+  watch('preview-tab');watch('builder-view');
+  _applyFocusState();
+})();
+
 function updateMobileMenu(){
   const inBuilder=!!currentFormId;
   document.getElementById('mobile-tabs-section').style.display=inBuilder?'block':'none';
@@ -6970,7 +7114,9 @@ function updateMobileMenu(){
   const acts=document.getElementById('mobile-actions');
   acts.innerHTML='';
   if(inBuilder){
-    [[true,'Save & Exit',()=>{closeMobileMenu();saveAndGoBack();}],[false,'▶ Preview',()=>{closeMobileMenu();switchTab('preview');}]].forEach(([prim,txt,fn])=>{
+    const _mobileBtns=[[true,'Save & Exit',()=>{closeMobileMenu();saveAndGoBack();}],[false,'▶ Preview',()=>{closeMobileMenu();switchTab('preview');}]];
+    if(_isExamShowing())_mobileBtns.push([false,'⤢ Focus mode',()=>{closeMobileMenu();toggleFocusMode(true);}]);
+    _mobileBtns.forEach(([prim,txt,fn])=>{
       const b=document.createElement('button');b.className='mobile-action-btn'+(prim?' primary':'');b.textContent=txt;b.addEventListener('click',fn);acts.appendChild(b);});
   }else{
     // Below 600px the topbar's own History/New Form buttons are hidden (see
