@@ -9289,7 +9289,13 @@ function deleteItem(id){const it2=items.find(it=>it.id===id);pushHistory(it2?(it
 // and the stats bar immediately; the debounced auto-save fires after the user
 // pauses (same 800 ms window as before), without touching the DOM list at all.
 const _debouncedAutoSave = _debounce(() => triggerAutoSave(), 800);
-function updateLabel(id,val){const q=items.find(it=>it.id===id);if(q){q.label=val;updateStats();_debouncedAutoSave();}}
+// PERF: typing a title changes neither the question count nor the points, but
+// updateStats() also rebuilt both section dropdowns and called
+// getBoundingClientRect() (a forced layout of the whole card list) on EVERY
+// keystroke. Only the live duplicate check is still needed, so just that runs,
+// debounced. The full updateStats() still runs after the autosave.
+const _debouncedDupRefresh=_debounce(()=>_refreshDuplicateFlags(),250);
+function updateLabel(id,val){const q=items.find(it=>it.id===id);if(q){q.label=val;_debouncedDupRefresh();_debouncedAutoSave();}}
 function updateSectionTitle(id,val){const s=items.find(it=>it.id===id);if(s){s.title=val;triggerAutoSave();}}
 function updateSectionDesc(id,val){const s=items.find(it=>it.id===id);if(s){s.description=val;triggerAutoSave();}}
 function updateOption(id,idx,val){const q=items.find(it=>it.id===id);if(q&&q.options){q.options[idx]=val;triggerAutoSave();}}
@@ -10049,25 +10055,30 @@ function bindBuilderEvents(){
   // and calling querySelector for every unrendered item wastes CPU on 150+ DOM
   // queries per keystroke. Checking the Set is an O(1) gate that short-circuits
   // the entire item body for anything not yet in the DOM.
-  const renderedIds = new Set(
-    Array.from(
-      document.querySelectorAll('#questions-list [data-itemid]'),
-      el => Number(el.dataset.itemid)
-    )
-  );
+  // PERF: this used to re-bind EVERY rendered card on every call (each scroll
+  // batch, each search jump, each re-render) using document-wide attribute
+  // selectors — cost grew roughly with the square of the rendered cards
+  // (measured: 60 cards ~0.4s, 240 cards ~11s in a DOM simulator). Now each
+  // card is bound once (re-bound only if its option/pair/answer count changes)
+  // and lookups are scoped to the card itself.
+  const cardById=new Map();
+  document.querySelectorAll('#questions-list [data-itemid]').forEach(el=>cardById.set(Number(el.dataset.itemid),el));
 
   items.forEach(it=>{
-    // Skip items whose cards have not been rendered by virtual scroll yet.
-    if(!renderedIds.has(it.id)) return;
+    const card=cardById.get(it.id);
+    if(!card) return; // not rendered yet by virtual scroll
+    const sig=[(it.options||[]).length,(it.pairs||[]).length,(it.acceptableAnswers||[]).length].join('/');
+    if(card._qbSig===sig) return; // already bound and structure unchanged
+    card._qbSig=sig;
 
     if(it.kind==='question'){
       const li=document.getElementById('ql-'+it.id);
       if(li){li.removeEventListener('input',li._h);li._h=e=>updateLabel(it.id,e.target.value);li.addEventListener('input',li._h);}
-      if(it.options){it.options.forEach((_,idx)=>{const oi=document.querySelector(`.opt-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(oi){oi.removeEventListener('input',oi._h);oi._h=e=>updateOption(it.id,idx,e.target.value);oi.addEventListener('input',oi._h);}});}
-      if(it.pairs){it.pairs.forEach((_,idx)=>{const pl=document.querySelector(`.pair-left[data-qid="${it.id}"][data-idx="${idx}"]`);const pr=document.querySelector(`.pair-right[data-qid="${it.id}"][data-idx="${idx}"]`);if(pl){pl.removeEventListener('input',pl._h);pl._h=e=>updatePairLeft(it.id,idx,e.target.value);pl.addEventListener('input',pl._h);}if(pr){pr.removeEventListener('input',pr._h);pr._h=e=>updatePairRight(it.id,idx,e.target.value);pr.addEventListener('input',pr._h);}});}
-      if(it.acceptableAnswers){it.acceptableAnswers.forEach((_,idx)=>{const ai=document.querySelector(`.trans-ans-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(ai){ai.removeEventListener('input',ai._h);ai._h=e=>updateAcceptableAnswer(it.id,idx,e.target.value);ai.addEventListener('input',ai._h);}});}
-      const pi=document.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value,10)||0;triggerAutoSave();}};pi.addEventListener('input',pi._h);}
-      const ts=document.querySelector(`.trans-source[data-qid="${it.id}"]`);if(ts){ts.removeEventListener('input',ts._h);ts._h=e=>{
+      if(it.options){it.options.forEach((_,idx)=>{const oi=card.querySelector(`.opt-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(oi){oi.removeEventListener('input',oi._h);oi._h=e=>updateOption(it.id,idx,e.target.value);oi.addEventListener('input',oi._h);}});}
+      if(it.pairs){it.pairs.forEach((_,idx)=>{const pl=card.querySelector(`.pair-left[data-qid="${it.id}"][data-idx="${idx}"]`);const pr=card.querySelector(`.pair-right[data-qid="${it.id}"][data-idx="${idx}"]`);if(pl){pl.removeEventListener('input',pl._h);pl._h=e=>updatePairLeft(it.id,idx,e.target.value);pl.addEventListener('input',pl._h);}if(pr){pr.removeEventListener('input',pr._h);pr._h=e=>updatePairRight(it.id,idx,e.target.value);pr.addEventListener('input',pr._h);}});}
+      if(it.acceptableAnswers){it.acceptableAnswers.forEach((_,idx)=>{const ai=card.querySelector(`.trans-ans-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(ai){ai.removeEventListener('input',ai._h);ai._h=e=>updateAcceptableAnswer(it.id,idx,e.target.value);ai.addEventListener('input',ai._h);}});}
+      const pi=card.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value,10)||0;triggerAutoSave();}};pi.addEventListener('input',pi._h);}
+      const ts=card.querySelector(`.trans-source[data-qid="${it.id}"]`);if(ts){ts.removeEventListener('input',ts._h);ts._h=e=>{
         const q=items.find(x=>x.id===it.id);
         if(q){
           q.sourceText=e.target.value;
@@ -10946,6 +10957,8 @@ function initCardDragDrop(){
   // input fields via el._h), a card left in the DOM across two of those
   // calls would accumulate a second full set of drag/drop listeners.
   document.querySelectorAll('#questions-list [data-itemid]').forEach(card=>{
+    if(card._dragBound)return; // PERF: already wired — don't rebuild 5 closures per card per call
+    card._dragBound=true;
     if(card._dragStartH)card.removeEventListener('dragstart',card._dragStartH);
     card._dragStartH=e=>{
       dragSrcId=parseInt(card.dataset.itemid,10);
