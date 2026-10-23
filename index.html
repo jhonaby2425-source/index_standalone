@@ -3363,6 +3363,62 @@ html body.qb-focus .sticky-nav-rail{top:0}
 }
 @media print{#sidebar-toggle-btn,#focus-toggle-btn,.focus-exit-group{display:none!important}}
 </style>
+<style id="qb-v2-additions">
+/* ── Extra colour themes: only override palette vars; layout stays "new look" ── */
+body.theme-ocean{--purple:#1f6fd1;--purple-light:#3b8cf0;--purple-dim:#e6f0fc;--purple-mid:#8ab8ef;--purple-700:#17559f;--purple-50:#f1f7fe;--form-accent:#1f6fd1;--ink:#10213a;--ink2:#1a3253;--surface2:#f0f4fa;--surface3:#e6ecf5;--border:#dbe3ef;--border-light:#e6ecf5;--border-strong:#c6d2e4;--shadow-focus:0 0 0 3px rgba(31,111,209,.25)}
+body.theme-forest{--purple:#2f8f5b;--purple-light:#45ad75;--purple-dim:#e5f4ec;--purple-mid:#8fcaa9;--purple-700:#226b43;--purple-50:#f1faf5;--form-accent:#2f8f5b;--ink:#12261c;--ink2:#1b3a2a;--surface2:#f1f5f1;--surface3:#e6ede6;--border:#dce5dc;--border-light:#e8eee8;--border-strong:#c5d3c5;--green:#146c43;--shadow-focus:0 0 0 3px rgba(47,143,91,.25)}
+body.theme-rose{--purple:#d6336c;--purple-light:#ee5a8f;--purple-dim:#fde7ef;--purple-mid:#f09ab8;--purple-700:#a82552;--purple-50:#fef3f7;--form-accent:#d6336c;--ink:#2a1220;--ink2:#3b1a2e;--surface2:#f8f1f3;--surface3:#f0e5e9;--border:#ecdde2;--border-light:#f3e8ec;--border-strong:#dcc5cd;--shadow-focus:0 0 0 3px rgba(214,51,108,.25)}
+body.theme-slate{--purple:#475569;--purple-light:#64748b;--purple-dim:#eef1f5;--purple-mid:#94a3b8;--purple-700:#334155;--purple-50:#f6f8fa;--form-accent:#475569;--ink:#0f172a;--ink2:#1e293b;--surface2:#f1f3f6;--surface3:#e7eaef;--border:#dde1e8;--border-light:#e7eaef;--border-strong:#c8ced9;--shadow-focus:0 0 0 3px rgba(71,85,105,.25)}
+body.theme-amber{--purple:#b86e00;--purple-light:#d98300;--purple-dim:#fff2dc;--purple-mid:#e8b866;--purple-700:#8f5500;--purple-50:#fff8ec;--form-accent:#b86e00;--ink:#2a1d0a;--ink2:#3b2a10;--shadow-focus:0 0 0 3px rgba(184,110,0,.25)}
+.theme-menu{position:fixed;z-index:10000;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-xl);padding:8px;min-width:210px;color:var(--text)}
+.theme-menu-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:4px 8px 6px}
+.theme-menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-radius:8px;padding:8px;font-size:13px;color:var(--text);cursor:pointer;text-align:left}
+.theme-menu button:hover{background:var(--surface2)}
+.theme-menu button.active{background:var(--purple-dim);font-weight:600}
+.theme-menu .sw{width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--border-strong);flex:none}
+/* History: exam picker */
+.hx-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.hx-search{flex:1;min-width:140px;border:1.5px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13px;background:var(--surface);color:var(--text);outline:none}
+.hx-search:focus{border-color:var(--purple)}
+.hx-btn{background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);padding:7px 12px;cursor:pointer;transition:all .12s}
+.hx-btn:hover{border-color:var(--purple-mid);color:var(--purple-700);background:var(--purple-dim)}
+.hx-btn.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+.hx-btn.primary:hover{background:var(--purple-light);color:#fff}
+.hx-btn:disabled{opacity:.4;cursor:not-allowed}
+.hx-exam-list{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto;padding-right:4px}
+.hx-exam{display:flex;align-items:center;gap:12px;text-align:left;width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .14s}
+.hx-exam:hover{border-color:var(--purple-mid);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.hx-exam-bar{width:5px;align-self:stretch;border-radius:4px;flex:none}
+.hx-exam-main{flex:1;min-width:0}
+.hx-exam-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hx-exam-meta{font-size:11.5px;color:var(--text3);margin-top:2px}
+.hx-spark{display:flex;align-items:flex-end;gap:2px;height:22px;margin-top:6px}
+.hx-spark i{display:block;width:7px;border-radius:2px;background:var(--purple-mid);min-height:2px}
+.hx-exam-score{text-align:right;flex:none}
+.hx-exam-score b{display:block;font-size:18px;color:var(--text)}
+.hx-exam-score span{font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.hx-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.hx-head-title{font-size:15px;font-weight:700;flex:1;min-width:120px}
+.hx-more{display:block;margin:12px auto 0}
+/* Weak-question modal */
+.weak-modal{max-width:720px;width:100%}
+.weak-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.weak-controls label{font-size:11.5px;color:var(--text2);display:flex;align-items:center;gap:5px}
+.weak-controls select{border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:12px;background:var(--surface);color:var(--text)}
+.weak-list{display:flex;flex-direction:column;gap:7px;max-height:42vh;overflow-y:auto;padding-right:4px}
+.weak-row{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer}
+.weak-row.sel{border-color:var(--purple);background:var(--purple-dim)}
+.weak-row input{margin-top:3px;accent-color:var(--purple)}
+.weak-q{font-size:13px;font-weight:500;color:var(--text);line-height:1.4}
+.weak-meta{font-size:11px;color:var(--text3);margin-top:3px}
+.weak-acc{flex:none;width:64px;text-align:right}
+.weak-acc b{font-size:15px}
+.weak-acc .bar{height:5px;border-radius:3px;background:var(--border);margin-top:4px;overflow:hidden}
+.weak-acc .bar i{display:block;height:100%;background:var(--red)}
+.weak-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border-light);padding-top:12px;margin-top:12px}
+.weak-foot input[type=text]{flex:1;min-width:160px;border:1.5px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13px;background:var(--surface);color:var(--text)}
+.weak-empty{text-align:center;padding:30px 10px;color:var(--text3);font-size:13px}
+</style>
 </head>
 <body>
 <script>
@@ -3370,7 +3426,8 @@ html body.qb-focus .sticky-nav-rail{top:0}
 // doesn't flash the other one on load. Same localStorage mechanism the app
 // already uses for its own data (see toggleAppTheme() in app.js below).
 try{
-  if(localStorage.getItem('qb_theme')==='classic'){document.body.classList.add('theme-classic');}
+  var _t=localStorage.getItem('qb_theme');
+  if(_t&&_t!=='new'&&/^[a-z]+$/.test(_t)){document.body.classList.add('theme-'+_t);}
 }catch(e){}
 </script>
 <script>
@@ -3515,7 +3572,7 @@ try{
            Label text is set on load/click so it always names the *other*
            theme (the thing clicking it will switch you to). -->
       <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleAppTheme()">
-        <span aria-hidden="true">🎨</span><span id="theme-toggle-label">Classic look</span>
+        <span aria-hidden="true">🎨</span><span id="theme-toggle-label">Theme</span>
       </button>
     </div>
   </aside>
@@ -4168,6 +4225,16 @@ try{
       <button class="modal-close" onclick="closeAttemptsModal()" aria-label="Close attempts history">×</button>
     </div>
     <div class="modal-body modal-body--attempts" id="attempts-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="weak-modal" style="display:none" onclick="if(event.target===this)closeWeakModal()" role="dialog" aria-modal="true" aria-labelledby="weak-modal-title">
+  <div class="modal weak-modal">
+    <div class="modal-header modal-header--purple">
+      <span class="modal-title" id="weak-modal-title">🎯 Weak Questions</span>
+      <button class="modal-close" onclick="closeWeakModal()" aria-label="Close weak questions">×</button>
+    </div>
+    <div class="modal-body" id="weak-modal-body"></div>
   </div>
 </div>
 
@@ -5495,15 +5562,56 @@ async function _updateRoleFromEmail(){
 // theme-classic-toggle <style> block); this just toggles the class,
 // persists the choice, and keeps the button's label naming whichever
 // theme clicking it would switch *to*.
+const APP_THEMES=[
+  {id:'new',name:'Coral (default)',sw:'#e6532c'},
+  {id:'classic',name:'Classic violet',sw:'#5b3df0'},
+  {id:'ocean',name:'Ocean blue',sw:'#1f6fd1'},
+  {id:'forest',name:'Forest green',sw:'#2f8f5b'},
+  {id:'rose',name:'Rose',sw:'#d6336c'},
+  {id:'amber',name:'Amber',sw:'#b86e00'},
+  {id:'slate',name:'Slate',sw:'#475569'}
+];
+function _currentThemeId(){
+  const t=APP_THEMES.find(t=>t.id!=='new'&&document.body.classList.contains('theme-'+t.id));
+  return t?t.id:'new';
+}
 function _updateThemeToggleLabel(){
   const label=document.getElementById('theme-toggle-label');
   if(!label)return;
-  label.textContent = document.body.classList.contains('theme-classic') ? 'New look' : 'Classic look';
+  const t=APP_THEMES.find(x=>x.id===_currentThemeId());
+  label.textContent='Theme: '+(t?t.name.replace(' (default)',''):'');
 }
-function toggleAppTheme(){
-  const isClassic = document.body.classList.toggle('theme-classic');
-  try{localStorage.setItem('qb_theme', isClassic ? 'classic' : 'new');}catch(e){}
+function applyAppTheme(id){
+  APP_THEMES.forEach(t=>{if(t.id!=='new')document.body.classList.remove('theme-'+t.id);});
+  if(id!=='new')document.body.classList.add('theme-'+id);
+  try{localStorage.setItem('qb_theme',id);}catch(e){}
   _updateThemeToggleLabel();
+  // keep the per-form accent in sync with the app palette on the dashboard
+  const cs=getComputedStyle(document.body).getPropertyValue('--purple').trim();
+  if(cs&&!document.body.classList.contains('in-builder'))document.documentElement.style.setProperty('--form-accent',cs);
+}
+function _closeThemeMenu(){const m=document.getElementById('theme-menu');if(m)m.remove();document.removeEventListener('mousedown',_themeMenuOutside,true);document.removeEventListener('keydown',_themeMenuKey,true);}
+function _themeMenuOutside(e){const m=document.getElementById('theme-menu');if(m&&!m.contains(e.target)&&!e.target.closest('#theme-toggle-btn'))_closeThemeMenu();}
+function _themeMenuKey(e){if(e.key==='Escape')_closeThemeMenu();}
+function toggleAppTheme(){
+  if(document.getElementById('theme-menu')){_closeThemeMenu();return;}
+  const btn=document.getElementById('theme-toggle-btn');if(!btn)return;
+  const menu=document.createElement('div');menu.id='theme-menu';menu.className='theme-menu';
+  const ttl=document.createElement('div');ttl.className='theme-menu-title';ttl.textContent='Choose a theme';menu.appendChild(ttl);
+  const cur=_currentThemeId();
+  APP_THEMES.forEach(t=>{
+    const b=document.createElement('button');b.type='button';if(t.id===cur)b.classList.add('active');
+    const sw=document.createElement('span');sw.className='sw';sw.style.background=t.sw;
+    b.append(sw,document.createTextNode(t.name));
+    b.addEventListener('click',()=>{applyAppTheme(t.id);_closeThemeMenu();});
+    menu.appendChild(b);
+  });
+  document.body.appendChild(menu);
+  const r=btn.getBoundingClientRect(),mh=menu.offsetHeight,mw=menu.offsetWidth;
+  menu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-mw-8))+'px';
+  menu.style.top=(r.top-mh-6>8?r.top-mh-6:Math.min(r.bottom+6,window.innerHeight-mh-8))+'px';
+  document.addEventListener('mousedown',_themeMenuOutside,true);
+  document.addEventListener('keydown',_themeMenuKey,true);
 }
 document.addEventListener('DOMContentLoaded', _updateThemeToggleLabel);
 
@@ -7199,51 +7307,119 @@ function updateAttemptsCounts(){const cnt=attempts.length;['topbar-attempts-coun
 // hidden for test-mode accounts via the .admin-only CSS rule, but this
 // function-level guard is kept as defense-in-depth against any leftover
 // entry point (e.g. a stray keyboard shortcut or a call from the console).
+let _attemptsFlat=false,_attemptsShown=10,_attemptsExamQuery='',_keepAttemptsFilter=false;
 function openAttemptsModal(){
   if(!_isAdmin)return;
+  // Opening from the top bar starts at the exam picker; viewFormAttempts()
+  // pre-selects an exam and sets _keepAttemptsFilter so we don't reset it.
+  if(!_keepAttemptsFilter){setState({attemptsFilter:'all'});}
+  _keepAttemptsFilter=false;_attemptsFlat=false;_attemptsShown=10;_attemptsExamQuery='';
   renderAttemptsModal();document.getElementById('attempts-modal').style.display='flex';
 }
 function closeAttemptsModal(){document.getElementById('attempts-modal').style.display='none';}
 function handleAttemptsOverlayClick(e){if(e.target===document.getElementById('attempts-modal'))closeAttemptsModal();}
 
+function _attemptsStatsBar(list){
+  const scored=list.filter(a=>a.score!=null&&a.hasScorable);
+  const avg=scored.length?Math.round(scored.reduce((t,a)=>t+a.score,0)/scored.length):null;
+  const best=scored.length?Math.max(...scored.map(a=>a.score)):null;
+  const bar=_makeDiv('attempts-stats-bar');
+  [{val:list.length,label:'Attempts'},{val:new Set(list.map(a=>a.formId)).size,label:'Exams'},...(avg!=null?[{val:avg+'%',label:'Avg'}]:[]),...(best!=null?[{val:best+'%',label:'Best',green:true}]:[])].forEach(st=>{
+    const el=_makeDiv('ast-stat');const v=_makeDiv('ast-stat-val');v.textContent=st.val;if(st.green)v.classList.add('text-green');
+    const l=_makeDiv('ast-stat-label');l.textContent=st.label;el.append(v,l);bar.appendChild(el);
+  });
+  return bar;
+}
+function _attemptsExportBar(){
+  const expDiv=_makeDiv('excel-export-section');
+  _setSafeInnerHTML(expDiv,`<span class="excel-export-label">📥 Download:</span>`);
+  const x1=_makeBtn('btn-excel','📄 All Attempts (.xlsx)',exportAttemptsToExcel);
+  const x2=_makeBtn('btn-excel js-excel-btn-dark','📊 Score Summary (.xlsx)',exportAnswersSummaryToExcel);
+  const x3=_makeBtn('btn-excel','📝 Answer Detail (.xlsx)',exportAnswerDetailToExcel);
+  expDiv.append(x1,x2,x3);return expDiv;
+}
+function _renderExamPicker(body){
+  const frag=document.createDocumentFragment();
+  frag.appendChild(_attemptsStatsBar(attempts));
+  // one summary per exam, most recently attempted first
+  const byForm=new Map();
+  attempts.forEach(a=>{(byForm.get(a.formId)||byForm.set(a.formId,[]).get(a.formId)).push(a);});
+  let exams=[...byForm.entries()].map(([fid,list])=>{
+    list.sort((x,y)=>new Date(y.date)-new Date(x.date));
+    const sc=list.filter(a=>a.hasScorable&&a.score!=null);
+    const f=forms.find(x=>x.id===fid);
+    return{fid,list,title:(f&&f.title)||list[0].formTitle||'Unknown',color:(f&&f.color)||list[0].formColor||'#5c35b1',
+      best:sc.length?Math.max(...sc.map(a=>a.score)):null,
+      avg:sc.length?Math.round(sc.reduce((t,a)=>t+a.score,0)/sc.length):null,
+      last:sc.length?sc[0].score:null,trend:sc.slice(0,8).reverse().map(a=>a.score),last_date:new Date(list[0].date)};
+  }).sort((a,b)=>b.last_date-a.last_date);
+  const tb=_makeDiv('hx-toolbar');
+  const search=document.createElement('input');search.type='search';search.className='hx-search';search.placeholder='Search exams…';search.value=_attemptsExamQuery;
+  tb.appendChild(search);
+  tb.appendChild(_makeBtn('hx-btn primary','🎯 Weak questions',()=>openWeakModal('all')));
+  tb.appendChild(_makeBtn('hx-btn','All attempts list',()=>{_attemptsFlat=true;_attemptsShown=10;renderAttemptsModal();}));
+  frag.appendChild(tb);
+  const listEl=_makeDiv('hx-exam-list');
+  function paint(){
+    listEl.innerHTML='';
+    const q=_attemptsExamQuery.trim().toLowerCase();
+    const shown=exams.filter(e=>!q||e.title.toLowerCase().includes(q));
+    if(!shown.length){const n=_makeDiv('weak-empty');n.textContent='No exams match your search.';listEl.appendChild(n);return;}
+    shown.forEach(e=>{
+      const card=document.createElement('button');card.type='button';card.className='hx-exam';
+      const bar=document.createElement('span');bar.className='hx-exam-bar';bar.style.background=e.color;
+      const main=_makeDiv('hx-exam-main');
+      const t=_makeDiv('hx-exam-title');t.textContent=e.title;
+      const m=_makeDiv('hx-exam-meta');
+      m.textContent=e.list.length+' attempt'+(e.list.length!==1?'s':'')+' · last '+e.last_date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      main.append(t,m);
+      if(e.trend.length>1){const sp=_makeDiv('hx-spark');e.trend.forEach(v=>{const i=document.createElement('i');i.style.height=Math.max(2,Math.round(v/100*22))+'px';i.title=v+'%';sp.appendChild(i);});main.appendChild(sp);}
+      const sc=_makeDiv('hx-exam-score');
+      const b=document.createElement('b');b.textContent=e.last!=null?e.last+'%':'—';
+      const sp2=document.createElement('span');sp2.textContent=e.best!=null?'Best '+e.best+'%':'No score';
+      sc.append(b,sp2);
+      card.append(bar,main,sc);
+      card.addEventListener('click',()=>{_attemptsShown=10;filterAttempts(e.fid);});
+      listEl.appendChild(card);
+    });
+  }
+  search.addEventListener('input',()=>{_attemptsExamQuery=search.value;paint();});
+  paint();
+  frag.appendChild(listEl);
+  frag.appendChild(_attemptsExportBar());
+  body.appendChild(frag);
+}
 function renderAttemptsModal(){
   const body=document.getElementById('attempts-modal-body');
   body.innerHTML='';
-  const filtered=attemptsFilter==='all'?attempts:attempts.filter(a=>a.formId===Number(attemptsFilter));
-  const scored=attempts.filter(a=>a.score!=null&&a.hasScorable);
-  const avg=scored.length?Math.round(scored.reduce((s,a)=>s+a.score,0)/scored.length):null;
-  const best=scored.length?Math.max(...scored.map(a=>a.score)):null;
-  const uForms=new Set(attempts.map(a=>a.formId)).size;
   if(!attempts.length){
     const emp=_makeDiv('attempts-empty');
     _setSafeInnerHTML(emp,'<div class="attempts-empty-icon">📊</div><div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">No attempts yet</div><div style="font-size:12px;color:var(--text3)">Submit a quiz in Preview to start tracking history.</div>');
     body.appendChild(emp);return;
   }
+  // Level 1: choose an exam. Level 2: that exam's attempts (or the flat list).
+  if(attemptsFilter==='all'&&!_attemptsFlat){_renderExamPicker(body);return;}
+  const filtered=attemptsFilter==='all'?attempts:attempts.filter(a=>a.formId===Number(attemptsFilter));
   const frag=document.createDocumentFragment();
-  const statsBar=_makeDiv('attempts-stats-bar');
-  [{val:attempts.length,label:'Attempts'},{val:uForms,label:'Forms'},...(avg!=null?[{val:avg+'%',label:'Avg'}]:[]),...(best!=null?[{val:best+'%',label:'Best',green:true}]:[])].forEach(s=>{
-    const st=_makeDiv('ast-stat');
-    const v=_makeDiv('ast-stat-val');v.textContent=s.val;if(s.green)v.classList.add('text-green');
-    const l=_makeDiv('ast-stat-label');l.textContent=s.label;
-    st.append(v,l);statsBar.appendChild(st);
-  });
-  frag.appendChild(statsBar);
-  const fOpts=Array.from(new Set(attempts.map(a=>a.formId))).map(fid=>{const fa=attempts.find(a=>a.formId===fid);return{id:fid,title:fa?fa.formTitle:'Unknown'};});
-  if(fOpts.length>1){
-    const filterDiv=_makeDiv('attempts-filter');
-    const allBtn=_makeBtn('attempts-filter-btn'+(attemptsFilter==='all'?' active':''),'All',()=>filterAttempts('all'));filterDiv.appendChild(allBtn);
-    fOpts.forEach(f=>{const btn=_makeBtn('attempts-filter-btn'+(Number(attemptsFilter)===f.id?' active':''),f.title,()=>filterAttempts(f.id));filterDiv.appendChild(btn);});
-    frag.appendChild(filterDiv);
-  }
+  const head=_makeDiv('hx-head');
+  head.appendChild(_makeBtn('hx-btn','← All exams',()=>{_attemptsFlat=false;setState({attemptsFilter:'all'});renderAttemptsModal();}));
+  const ht=_makeDiv('hx-head-title');
+  const fForm=attemptsFilter==='all'?null:forms.find(x=>x.id===Number(attemptsFilter));
+  ht.textContent=attemptsFilter==='all'?'All attempts':((fForm&&fForm.title)||(filtered[0]&&filtered[0].formTitle)||'Exam');
+  head.appendChild(ht);
+  head.appendChild(_makeBtn('hx-btn primary','🎯 Weak questions',()=>openWeakModal(attemptsFilter==='all'?'all':Number(attemptsFilter))));
+  frag.appendChild(head);
+  frag.appendChild(_attemptsStatsBar(filtered));
+  if(!filtered.length){const ne=_makeDiv('js-no-filtered');ne.textContent='No attempts for this exam yet.';frag.appendChild(ne);body.appendChild(frag);return;}
   const cRow=_makeDiv('js-count-row');
   const cLabel=_makeDiv('js-count-label');cLabel.textContent=filtered.length+' attempt'+(filtered.length!==1?'s':'');
-  const clrBtn=_makeBtn('attempts-clear-all','Clear All',clearAllAttempts);
-  cRow.append(cLabel,clrBtn);frag.appendChild(cRow);
-  if(!filtered.length){const ne=_makeDiv('js-no-filtered');ne.textContent='No attempts for this form yet.';frag.appendChild(ne);body.appendChild(frag);return;}
+  cRow.append(cLabel);
+  if(attemptsFilter==='all')cRow.append(_makeBtn('attempts-clear-all','Clear All',clearAllAttempts));
+  frag.appendChild(cRow);
   const tpl=document.getElementById('tpl-attempt-row');
   const listDiv=_makeDiv('attempts-list');
-  filtered.forEach(a=>{
-    const fa=attempts.filter(x=>x.formId===a.formId);const num=fa.indexOf(a)+1;
+  filtered.slice(0,_attemptsShown).forEach(a=>{
+    const fa=attempts.filter(x=>x.formId===a.formId);const num=fa.length-fa.indexOf(a); // oldest attempt = #1
     const d=new Date(a.date);
     const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     const ts=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
@@ -7254,19 +7430,10 @@ function renderAttemptsModal(){
     row.querySelector('.attempt-form-title').textContent=a.formTitle||'Unknown';
     let dateStr=ds+' at '+ts;if(a.hasScorable)dateStr+=' · '+a.correct+'✓ '+a.wrong+'✗';if(a.totalQ)dateStr+=' · '+a.totalQ+'Q';
     const dateEl=row.querySelector('.attempt-date');dateEl.textContent=dateStr;
-    if(a.rescored&&a.originalScore!=null&&a.originalScore!==a.score){
-      const badge=document.createElement('span');badge.className='rescored-badge';
-      badge.textContent=`🔄 Rescored (was ${a.originalScore}%)`;
-      dateEl.appendChild(document.createElement('br'));dateEl.appendChild(badge);
-    } else if(a.rescored){
-      const badge=document.createElement('span');badge.className='rescored-badge';
-      badge.textContent='🔄 Rescored';
-      dateEl.appendChild(document.createElement('br'));dateEl.appendChild(badge);
-    } else if(a.cannotRescore){
-      const badge=document.createElement('span');badge.className='rescored-badge js-badge-warn';
-      badge.textContent='⚠ Score may be outdated — no answer data';
-      dateEl.appendChild(document.createElement('br'));dateEl.appendChild(badge);
-    }
+    const addBadge=(txt,warn)=>{const badge=document.createElement('span');badge.className='rescored-badge'+(warn?' js-badge-warn':'');badge.textContent=txt;dateEl.appendChild(document.createElement('br'));dateEl.appendChild(badge);};
+    if(a.rescored&&a.originalScore!=null&&a.originalScore!==a.score)addBadge(`🔄 Rescored (was ${a.originalScore}%)`);
+    else if(a.rescored)addBadge('🔄 Rescored');
+    else if(a.cannotRescore)addBadge('⚠ Score may be outdated — no answer data',true);
     const sb=row.querySelector('.attempt-score-badge');sb.className='attempt-score-badge '+sc;sb.textContent=st;
     const ptEl=row.querySelector('.attempt-pts');if(a.total>0)ptEl.textContent=a.earned+'/'+a.total+' pts';
     row.querySelector('.attempt-del-btn').addEventListener('click',()=>deleteAttempt(a.id));
@@ -7275,18 +7442,145 @@ function renderAttemptsModal(){
     listDiv.appendChild(row);
   });
   frag.appendChild(listDiv);
-  const expDiv=_makeDiv('excel-export-section');
-  _setSafeInnerHTML(expDiv,`<span class="excel-export-label">📥 Download:</span>`);
-  const xBtn1=_makeBtn('btn-excel','',exportAttemptsToExcel);
-  _setSafeInnerHTML(xBtn1,`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>All Attempts (.xlsx)`);
-  const xBtn2=_makeBtn('btn-excel js-excel-btn-dark','',exportAnswersSummaryToExcel);
-  _setSafeInnerHTML(xBtn2,`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>Score Summary (.xlsx)`);
-  const xBtn3=_makeBtn('btn-excel','',exportAnswerDetailToExcel);
-  _setSafeInnerHTML(xBtn3,`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="12" y1="9" x2="12" y2="21"/></svg>Answer Detail (.xlsx)`);
-  expDiv.append(xBtn1,xBtn2,xBtn3);frag.appendChild(expDiv);
+  if(filtered.length>_attemptsShown){
+    const left=filtered.length-_attemptsShown;
+    frag.appendChild(_makeBtn('hx-btn hx-more','Show '+Math.min(10,left)+' more ('+left+' left)',()=>{_attemptsShown+=10;renderAttemptsModal();}));
+  }
+  frag.appendChild(_attemptsExportBar());
   body.appendChild(frag);
 }
-function filterAttempts(v){setState({attemptsFilter:v});renderAttemptsModal();}
+
+// ── §WEAK — weakest-question analysis + practice-exam builder ────────────────
+// Aggregates every saved attempt's per-question result, ranks questions by
+// accuracy (lowest first) and lets the admin turn any selection into a brand
+// new practice form (copying the live question, or the attempt snapshot if the
+// original question/form has since been deleted).
+let _weak={formId:'all',threshold:70,minSeen:1,selected:new Set(),rows:[],shuffle:true};
+function computeWeakQuestionStats(formId){
+  const agg=new Map();
+  attempts.forEach(a=>{
+    if(formId!=='all'&&a.formId!==Number(formId))return;
+    if(!a.questionSnapshot||!a.answers)return;
+    computeAttemptResults(a).forEach(r=>{
+      if(!r.hasCorrect)return;
+      const key=a.formId+':'+r.q.id;
+      let e=agg.get(key);
+      if(!e){e={key,formId:a.formId,qid:r.q.id,q:r.q,seen:0,right:0,lastDate:0,lastRight:false};agg.set(key,e);}
+      e.seen++;if(r.correct)e.right++;
+      const t=Date.parse(a.date)||0;
+      if(t>=e.lastDate){e.lastDate=t;e.lastRight=r.correct;e.q=r.q;}
+    });
+  });
+  return [...agg.values()].map(e=>{
+    const f=forms.find(x=>x.id===e.formId);
+    return{...e,formTitle:(f&&f.title)||'(deleted exam)',acc:Math.round(e.right/e.seen*100)};
+  }).sort((a,b)=>a.acc-b.acc||b.seen-a.seen||(a.lastRight===b.lastRight?0:a.lastRight?1:-1));
+}
+function _weakText(q){
+  const raw=(q.type==='translation'?(q.sourceText||q.label):(q.label||q.sourceText))||'(untitled)';
+  const t=String(raw).replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+  return t.length>160?t.slice(0,157)+'…':t;
+}
+function openWeakModal(formId){
+  if(!_isAdmin)return;
+  _weak.formId=formId==null?'all':formId;_weak.selected=new Set();
+  renderWeakModal(true);
+  document.getElementById('weak-modal').style.display='flex';
+}
+function closeWeakModal(){document.getElementById('weak-modal').style.display='none';}
+function _weakRefreshRows(autoSelect){
+  const all=computeWeakQuestionStats(_weak.formId);
+  _weak.rows=all.filter(r=>r.acc<_weak.threshold&&r.seen>=_weak.minSeen);
+  const keys=new Set(_weak.rows.map(r=>r.key));
+  if(autoSelect)_weak.selected=new Set(_weak.rows.slice(0,20).map(r=>r.key));
+  else _weak.selected=new Set([..._weak.selected].filter(k=>keys.has(k)));
+}
+function renderWeakModal(autoSelect){
+  _weakRefreshRows(autoSelect);
+  const body=document.getElementById('weak-modal-body');body.innerHTML='';
+  // controls
+  const ctr=_makeDiv('weak-controls');
+  const mkSel=(label,opts,val,onchg)=>{
+    const l=document.createElement('label');l.append(document.createTextNode(label));
+    const sel=document.createElement('select');
+    opts.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;if(String(v)===String(val))o.selected=true;sel.appendChild(o);});
+    sel.addEventListener('change',()=>onchg(sel.value));l.appendChild(sel);return l;
+  };
+  const examIds=[...new Set(attempts.map(a=>a.formId))];
+  ctr.appendChild(mkSel('Exam',[['all','All exams'],...examIds.map(id=>{const f=forms.find(x=>x.id===id);const a=attempts.find(x=>x.formId===id);return[id,(f&&f.title)||(a&&a.formTitle)||'Unknown'];})],_weak.formId,v=>{_weak.formId=v==='all'?'all':Number(v);renderWeakModal(true);}));
+  ctr.appendChild(mkSel('Accuracy below',[[50,'50%'],[70,'70%'],[80,'80%'],[101,'any miss (<100%)']],_weak.threshold,v=>{_weak.threshold=Number(v);renderWeakModal(true);}));
+  ctr.appendChild(mkSel('Seen at least',[[1,'1×'],[2,'2×'],[3,'3×']],_weak.minSeen,v=>{_weak.minSeen=Number(v);renderWeakModal(true);}));
+  body.appendChild(ctr);
+  if(!_weak.rows.length){
+    const e=_makeDiv('weak-empty');
+    e.textContent=attempts.length?'No questions match these filters — nice work! Loosen the accuracy filter to see more.':'No attempts yet.';
+    body.appendChild(e);return;
+  }
+  const sum=_makeDiv('weak-meta');sum.style.marginBottom='8px';
+  sum.textContent=_weak.rows.length+' weak question'+(_weak.rows.length!==1?'s':'')+' found · '+_weak.selected.size+' selected';
+  body.appendChild(sum);
+  const bar=_makeDiv('weak-controls');
+  bar.appendChild(_makeBtn('hx-btn','Select all',()=>{_weak.selected=new Set(_weak.rows.map(r=>r.key));renderWeakModal(false);}));
+  bar.appendChild(_makeBtn('hx-btn','Weakest 10',()=>{_weak.selected=new Set(_weak.rows.slice(0,10).map(r=>r.key));renderWeakModal(false);}));
+  bar.appendChild(_makeBtn('hx-btn','None',()=>{_weak.selected=new Set();renderWeakModal(false);}));
+  body.appendChild(bar);
+  const list=_makeDiv('weak-list');
+  _weak.rows.forEach(r=>{
+    const row=document.createElement('label');row.className='weak-row'+(_weak.selected.has(r.key)?' sel':'');
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=_weak.selected.has(r.key);
+    cb.addEventListener('change',()=>{cb.checked?_weak.selected.add(r.key):_weak.selected.delete(r.key);row.classList.toggle('sel',cb.checked);updateWeakFooter();});
+    const main=document.createElement('div');main.style.flex='1';main.style.minWidth='0';
+    const q=_makeDiv('weak-q');q.textContent=_weakText(r.q);
+    const m=_makeDiv('weak-meta');m.textContent=r.formTitle+' · '+r.right+'/'+r.seen+' correct'+(r.lastRight?' · last time ✓':' · last time ✗');
+    main.append(q,m);
+    const acc=_makeDiv('weak-acc');const b=document.createElement('b');b.textContent=r.acc+'%';
+    const br=_makeDiv('bar');const fill=document.createElement('i');fill.style.width=r.acc+'%';br.appendChild(fill);acc.append(b,br);
+    row.append(cb,main,acc);list.appendChild(row);
+  });
+  body.appendChild(list);
+  const foot=_makeDiv('weak-foot');
+  const ti=document.createElement('input');ti.type='text';ti.id='weak-title';ti.placeholder='Practice exam title';
+  ti.value='Weak Questions Practice — '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const sl=document.createElement('label');sl.className='weak-meta';sl.style.cssText='display:flex;align-items:center;gap:5px;margin:0';
+  const sc=document.createElement('input');sc.type='checkbox';sc.checked=_weak.shuffle;sc.addEventListener('change',()=>{_weak.shuffle=sc.checked;});
+  sl.append(sc,document.createTextNode('Shuffle'));
+  const go=_makeBtn('hx-btn primary','',createPracticeFromWeak);go.id='weak-create-btn';
+  foot.append(ti,sl,go);body.appendChild(foot);
+  updateWeakFooter();
+}
+function updateWeakFooter(){
+  const go=document.getElementById('weak-create-btn');if(!go)return;
+  go.textContent='Create practice exam ('+_weak.selected.size+')';go.disabled=_weak.selected.size===0;
+  const sum=document.querySelector('#weak-modal-body .weak-meta');
+  if(sum&&/weak question/.test(sum.textContent))sum.textContent=_weak.rows.length+' weak question'+(_weak.rows.length!==1?'s':'')+' found · '+_weak.selected.size+' selected';
+}
+async function createPracticeFromWeak(){
+  if(!_isAdmin){showShortcutToast('Only the admin can create forms.');return;}
+  const sel=_weak.rows.filter(r=>_weak.selected.has(r.key));
+  if(!sel.length)return;
+  const titleEl=document.getElementById('weak-title');
+  const title=((titleEl&&titleEl.value)||'').trim()||'Weak Questions Practice';
+  const cache=new Map(),picked=[];
+  for(const r of sel){
+    if(!cache.has(r.formId))cache.set(r.formId,await loadQuestions(r.formId));
+    const live=cache.get(r.formId).find(it=>it.kind==='question'&&it.id===r.qid);
+    picked.push(JSON.parse(JSON.stringify(live||{...r.q,kind:'question'})));
+  }
+  if(_weak.shuffle){for(let i=picked.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[picked[i],picked[j]]=[picked[j],picked[i]];}}
+  const types=[...new Set(picked.map(q=>q.type))];
+  const mode=(types.length===1&&MODES.some(m=>m.val===types[0]))?types[0]:'radio';
+  const f={id:_allocFormId(),title,desc:'Practice set built from '+picked.length+' lowest-scoring question'+(picked.length!==1?'s':'')+'.',mode,
+    questionCount:picked.length,color:COLOR_THEMES[forms.length%COLOR_THEMES.length].hex,createdAt:Date.now(),updatedAt:Date.now()};
+  setState({forms:[...forms,f]});
+  closeWeakModal();closeAttemptsModal();
+  _folderViewOrigin=null;
+  await openForm(f.id);
+  picked.forEach(q=>{q.id=_allocId();q.kind='question';items.push(q);});
+  f.questionCount=picked.length;
+  renderBuilder();triggerAutoSave();
+  showShortcutToast('Practice exam created with '+picked.length+' questions — press Preview to take it.');
+}
+function filterAttempts(v){_attemptsFlat=false;setState({attemptsFilter:v});renderAttemptsModal();const b=document.getElementById('attempts-modal-body');if(b)b.scrollTop=0;}
 function deleteAttempt(id){
   _tombAdd('attempts',id);
   setState({attempts:attempts.filter(a=>a.id!==id)});
@@ -8716,7 +9010,7 @@ function _closeFolderDrawer(){
 window._openGroupPickerForGroup = function(groupId){
   _openFolderView(groupId);
 };
-function viewFormAttempts(fid){setState({attemptsFilter:fid});openAttemptsModal();}
+function viewFormAttempts(fid){setState({attemptsFilter:fid});_keepAttemptsFilter=true;openAttemptsModal();}
 function setFormColor(id,c){const f=forms.find(x=>x.id===id);if(!f)return;f.color=c;_invalidateSortedForms();persistFormById(id);renderDashboard();}
 
 // §NAVIGATION ─────────────────────────────────────────────────────────────────
@@ -11448,7 +11742,20 @@ function buildPreviewPages(){
 function getQuestionsOnPage(pi){if(!previewPages[pi])return[];return previewPages[pi].filter(it=>it.kind==='question');}
 function isPageAnswered(pi){const qs=getQuestionsOnPage(pi);return qs.length>0&&qs.every(q=>!isBlank(q.id));}
 function hasPageErrors(pi){if(!previewValidation)return false;return getQuestionsOnPage(pi).some(q=>q.required&&isBlank(q.id));}
-function goToPage(pi){if(pi<0||pi>=previewPages.length)return;setState({currentPage:pi});renderPreview();}
+function goToPage(pi){
+  if(pi<0||pi>=previewPages.length)return;
+  setState({currentPage:pi});
+  renderPreview();
+  // FIX: after clicking Next/Previous (usually from the bottom nav strip) the
+  // re-rendered page used to keep the old scroll offset, so the examinee
+  // landed at the BOTTOM of the new section. Always start a newly opened
+  // section at its top. Results/review (previewSubmitted) keep their own
+  // Top/Bottom jump buttons, so this only applies while taking the exam.
+  if(!previewSubmitted){
+    window.scrollTo({top:0,behavior:'auto'});
+    requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'}));
+  }
+}
 
 function renderPreview(){
   const wrap=document.getElementById('preview-content');
@@ -14100,6 +14407,7 @@ function _handleTrapEscape(e){
   const patches=[
     {id:'attempts-modal',open:'openAttemptsModal',close:'closeAttemptsModal'},
     {id:'attempt-detail-modal',open:'openAttemptDetailModal',close:'closeAttemptDetailModal'},
+    {id:'weak-modal',open:'openWeakModal',close:'closeWeakModal'},
     {id:'import-modal',open:'openImportModal',close:'closeImportModal'},
     {id:'lib-modal',open:'openLibModal',close:'closeLibModal'},
     {id:'duplicates-modal',open:'openDuplicatesModal',close:'closeDuplicatesModal'},
