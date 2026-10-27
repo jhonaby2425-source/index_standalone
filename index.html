@@ -3418,6 +3418,15 @@ body.theme-amber{--purple:#b86e00;--purple-light:#d98300;--purple-dim:#fff2dc;--
 .weak-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border-light);padding-top:12px;margin-top:12px}
 .weak-foot input[type=text]{flex:1;min-width:160px;border:1.5px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13px;background:var(--surface);color:var(--text)}
 .weak-empty{text-align:center;padding:30px 10px;color:var(--text3);font-size:13px}
+.rv-row{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;background:var(--surface);cursor:pointer;margin-bottom:6px}
+.rv-row.sel{border-color:var(--green);background:var(--green-bg)}
+.rv-row input{margin-top:3px;accent-color:var(--green)}
+.rv-group{margin-bottom:14px}
+.rv-q{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.rv-key{font-size:11.5px;color:var(--text3);margin-bottom:6px}
+.rv-ans{font-size:13px;color:var(--text)}
+.rv-count{font-size:11px;color:var(--text3);margin-top:2px}
+.rv-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--purple-50);border:1.5px solid var(--purple-mid);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text2)}
 </style>
 </head>
 <body>
@@ -4225,6 +4234,16 @@ try{
       <button class="modal-close" onclick="closeAttemptsModal()" aria-label="Close attempts history">×</button>
     </div>
     <div class="modal-body modal-body--attempts" id="attempts-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reval-modal" style="display:none;z-index:5000" onclick="if(event.target===this)closeRevalModal()" role="dialog" aria-modal="true" aria-labelledby="reval-modal-title">
+  <div class="modal weak-modal">
+    <div class="modal-header modal-header--purple">
+      <span class="modal-title" id="reval-modal-title">🔄 Revalidate Answers</span>
+      <button class="modal-close" onclick="closeRevalModal()" aria-label="Close revalidate">×</button>
+    </div>
+    <div class="modal-body" id="reval-modal-body"></div>
   </div>
 </div>
 
@@ -7415,7 +7434,8 @@ function renderAttemptsModal(){
   const fForm=attemptsFilter==='all'?null:forms.find(x=>x.id===Number(attemptsFilter));
   ht.textContent=attemptsFilter==='all'?'All attempts':((fForm&&fForm.title)||(filtered[0]&&filtered[0].formTitle)||'Exam');
   head.appendChild(ht);
-  head.appendChild(_makeBtn('hx-btn primary','🎯 Weak questions',()=>openWeakModal(attemptsFilter==='all'?'all':Number(attemptsFilter))));
+  if(attemptsFilter!=='all')head.appendChild(_makeBtn('hx-btn primary','🔄 Validate answers',()=>openRevalModal(Number(attemptsFilter))));
+  head.appendChild(_makeBtn('hx-btn','🎯 Weak questions',()=>openWeakModal(attemptsFilter==='all'?'all':Number(attemptsFilter))));
   frag.appendChild(head);
   frag.appendChild(_attemptsStatsBar(filtered));
   if(!filtered.length){const ne=_makeDiv('js-no-filtered');ne.textContent='No attempts for this exam yet.';frag.appendChild(ne);body.appendChild(frag);return;}
@@ -7702,6 +7722,26 @@ function renderAttemptDetailModal(attemptId){
   const results=computeAttemptResults(a);
   const tpl=document.getElementById('tpl-review-card');
   const frag=document.createDocumentFragment();
+  if(_isAdmin){
+    const wrongGroups=collectWrongFreeText(a.formId,a.id,currentFormId===a.formId?_rejectedMapFromList(items):null);
+    const nWrong=wrongGroups.reduce((n,g)=>n+g.answers.length,0);
+    if(nWrong){
+      const ban=_makeDiv('rv-banner');
+      const t=document.createElement('span');t.textContent=nWrong+' typed answer'+(nWrong!==1?'s were':' was')+' marked wrong in this attempt.';
+      const allBtn=_makeBtn('hx-btn primary','✓ Accept all & rescore',async()=>{
+        if(!await _confirmModal('Accept all '+nWrong+' typed answer'+(nWrong!==1?'s':'')+' from this attempt as correct?\n\nEvery attempt of this exam will be rescored.','Accept all','Cancel',false))return;
+        allBtn.disabled=true;allBtn.textContent='Accepting…';
+        try{
+          const entries=[];wrongGroups.forEach(g=>g.answers.forEach(e=>entries.push({qid:g.qid,answer:e.raw})));
+          const n=await bulkAcceptAnswers(a.formId,entries);
+          showShortcutToast(n?n+' answer'+(n!==1?'s':'')+' accepted — all attempts rescored':'Nothing new to accept');
+          renderAttemptDetailModal(attemptId);renderAttemptsModal();
+        }catch(e){console.warn(e);allBtn.disabled=false;allBtn.textContent='✓ Accept all & rescore';}
+      });
+      const rvBtn=_makeBtn('hx-btn','Review whole exam…',()=>openRevalModal(a.formId));
+      ban.append(t,allBtn,rvBtn);frag.appendChild(ban);
+    }
+  }
   results.forEach((r,idx)=>{
     const{q,ans,correct,hasCorrect}=r;
     const handler=QUESTION_TYPES[q.type];
@@ -7810,6 +7850,340 @@ async function acceptAnswerAsCorrect(formId,qid,rawAnswer){
 
   await retrogradeScoreAttemptsForForm(formId,{force:true});
   showShortcutToast(already?'Already an accepted answer for this question':'Answer accepted — past attempts rescored');
+}
+
+
+// ── §REVALIDATE — bulk "accept wrong free-text answers" + one-pass rescore ───
+// Collects every distinct wrong (non-blank) short/translation answer across a
+// form's attempts (or one attempt), groups them by question, and accepts the
+// chosen ones as alternate correct answers in ONE save + ONE rescore, instead
+// of clicking "Accept this answer as correct" sentence by sentence.
+function _rejectedMapFromList(list){
+  const m=new Map();
+  (list||[]).forEach(q=>{if(q&&q.kind==='question'&&Array.isArray(q.rejectedAnswers)&&q.rejectedAnswers.length)m.set(q.id,new Set(q.rejectedAnswers.map(_normTxt)));});
+  return m;
+}
+function collectWrongFreeText(formId,onlyAttemptId,rejMap){
+  const groups=new Map();
+  attempts.forEach(a=>{
+    if(a.formId!==formId)return;
+    if(onlyAttemptId!=null&&a.id!==onlyAttemptId)return;
+    if(!a.questionSnapshot||!a.answers)return;
+    computeAttemptResults(a).forEach(r=>{
+      const{q,ans,correct,hasCorrect}=r;
+      if(!(q.type==='short'||q.type==='translation')||!hasCorrect||correct)return;
+      const h=QUESTION_TYPES[q.type];
+      if(!h||h.isBlank(q,ans))return;
+      const raw=String(ans).trim();if(!raw)return;
+      const k=_normTxt(raw);
+      if(rejMap&&rejMap.has(q.id)&&rejMap.get(q.id).has(k))return; // already judged "wrong" by the grader
+      let g=groups.get(q.id);
+      if(!g){g={qid:q.id,q,answers:new Map()};groups.set(q.id,g);}
+      let e=g.answers.get(k);
+      if(!e){e={raw,count:0};g.answers.set(k,e);}
+      e.count++;
+    });
+  });
+  return [...groups.values()].map(g=>({qid:g.qid,q:g.q,answers:[...g.answers.values()].sort((x,y)=>y.count-x.count)}));
+}
+async function _loadFormQuestionList(formId){
+  if(currentFormId===formId)return items;
+  const rec=await loadQuestions(formId).catch(()=>[]);
+  return Array.isArray(rec)?rec:((rec&&rec.items)||[]);
+}
+// Applies grader decisions in ONE save (+ ONE rescore if the answer bank changed):
+//   accepted → added to the question's answer bank (acceptableAnswers)
+//   rejected → remembered in q.rejectedAnswers so it is never asked about again
+//   removed  → taken OUT of the bank (an answer that was auto-marked correct but isn't)
+async function bulkAcceptAnswers(formId,entries,rejectedEntries,removeEntries){
+  rejectedEntries=rejectedEntries||[];removeEntries=removeEntries||[];
+  if(!entries.length&&!rejectedEntries.length&&!removeEntries.length)return 0;
+  const isLive=(currentFormId===formId);
+  const qList=await _loadFormQuestionList(formId);
+  let added=0,removed=0,blocked=0;
+  const findQ=qid=>qList.find(it=>it.id===qid&&it.kind==='question');
+  entries.forEach(({qid,answer})=>{
+    const q=findQ(qid);
+    if(!q||(q.type!=='short'&&q.type!=='translation'))return;
+    const val=String(answer).trim();if(!val)return;
+    if(!Array.isArray(q.acceptableAnswers)||!q.acceptableAnswers.length)q.acceptableAnswers=q.correct?[q.correct]:[];
+    if(!q.acceptableAnswers.some(x=>_normTxt(x)===_normTxt(val))){
+      const blank=q.acceptableAnswers.findIndex(x=>!x||!x.trim());
+      if(blank>=0)q.acceptableAnswers[blank]=val;else q.acceptableAnswers.push(val);
+      added++;
+    }
+    if(Array.isArray(q.rejectedAnswers))q.rejectedAnswers=q.rejectedAnswers.filter(x=>_normTxt(x)!==_normTxt(val));
+  });
+  removeEntries.forEach(({qid,answer})=>{
+    const q=findQ(qid);
+    if(!q||(q.type!=='short'&&q.type!=='translation'))return;
+    const val=String(answer).trim();if(!val)return;
+    if(!Array.isArray(q.acceptableAnswers)||!q.acceptableAnswers.length)q.acceptableAnswers=q.correct?[q.correct]:[];
+    const keep=q.acceptableAnswers.filter(x=>_normTxt(x)!==_normTxt(val));
+    // never strip the LAST accepted answer — that would leave the question ungradable
+    if(keep.filter(x=>x&&x.trim()).length===0){blocked++;return;}
+    if(keep.length!==q.acceptableAnswers.length){q.acceptableAnswers=keep;removed++;}
+    if(!Array.isArray(q.rejectedAnswers))q.rejectedAnswers=[];
+    if(!q.rejectedAnswers.some(x=>_normTxt(x)===_normTxt(val)))q.rejectedAnswers.push(val);
+  });
+  rejectedEntries.forEach(({qid,answer})=>{
+    const q=findQ(qid);if(!q)return;
+    const val=String(answer).trim();if(!val)return;
+    if(!Array.isArray(q.rejectedAnswers))q.rejectedAnswers=[];
+    if(!q.rejectedAnswers.some(x=>_normTxt(x)===_normTxt(val)))q.rejectedAnswers.push(val);
+  });
+  if(isLive){triggerAutoSave();renderBuilder();}
+  else await _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:formId,items:qList}),{label:'bulkAcceptAnswers dbPutOne',failMsg:'Could not save your decisions — try again.'});
+  if(added>0||removed>0)await retrogradeScoreAttemptsForForm(formId,{force:true});
+  if(blocked)showShortcutToast(blocked+' answer'+(blocked!==1?'s were':' was')+' kept: it is the only accepted answer for its question.');
+  return added+removed;
+}
+
+// ── Answer validator ─────────────────────────────────────────────────────────
+// Lists every distinct typed answer (short answer + translation) with whether it
+// is currently marked correct or wrong against the saved answer bank, so the
+// grader can filter/sort and judge BOTH directions:
+//   • marked wrong  → "Correct — add to bank"  / "Wrong"
+//   • marked correct → "Truly correct" / "Not correct — remove from bank"
+let _reval={formId:null,mode:'one',filter:'wrong',sort:'count',all:[],groups:[],queue:[],pos:0,decisions:[],selected:new Set(),qMap:new Map(),rejCount:0,keyHandler:null};
+function collectFreeTextAnswers(formId,qMap,rejMap){
+  const out=new Map();const order=new Map();[...qMap.keys()].forEach((id,i)=>order.set(id,i));
+  attempts.forEach(a=>{
+    if(a.formId!==formId||!a.questionSnapshot||!a.answers)return;
+    a.questionSnapshot.forEach(sq=>{
+      const q=qMap.get(sq.id)||sq;
+      if(q.type!=='short'&&q.type!=='translation')return;
+      const h=QUESTION_TYPES[q.type];if(!h||!h.hasCorrect(q))return;
+      const ans=(a.answers[sq.id]!==undefined)?a.answers[sq.id]:a.answers[String(sq.id)];
+      if(h.isBlank(q,ans))return;
+      const raw=String(ans).trim();if(!raw)return;
+      const k=_normTxt(raw);
+      const correct=!!(h.score(q,ans)||{}).correct;
+      if(!correct&&rejMap&&rejMap.has(q.id)&&rejMap.get(q.id).has(k))return; // already judged wrong
+      const key=q.id+'||'+k;
+      let e=out.get(key);
+      if(!e){e={qid:q.id,q,raw,count:0,correct,order:order.has(q.id)?order.get(q.id):9999};out.set(key,e);}
+      e.count++;
+    });
+  });
+  return [...out.values()];
+}
+async function _revalReload(){
+  const qList=await _loadFormQuestionList(_reval.formId);
+  const rejMap=_rejectedMapFromList(qList);
+  _reval.qMap=new Map(qList.filter(it=>it.kind==='question').map(q=>[q.id,q]));
+  _reval.rejCount=[...rejMap.values()].reduce((n,st)=>n+st.size,0);
+  _reval.all=collectFreeTextAnswers(_reval.formId,_reval.qMap,rejMap);
+  _revalRebuild();
+}
+function _revalRebuild(){
+  const f=_reval.filter;
+  let q=_reval.all.filter(e=>f==='all'||(f==='wrong'?!e.correct:e.correct));
+  const so=_reval.sort;
+  q.sort((x,y)=>so==='alpha'?x.raw.localeCompare(y.raw):so==='order'?(x.order-y.order||y.count-x.count):(y.count-x.count||x.order-y.order));
+  _reval.queue=q;_reval.pos=0;_reval.decisions=[];
+  // bulk list = wrong answers only, grouped per question
+  const gm=new Map();
+  _reval.all.filter(e=>!e.correct).sort((x,y)=>x.order-y.order||y.count-x.count).forEach(e=>{
+    let g=gm.get(e.qid);if(!g){g={qid:e.qid,q:e.q,answers:[]};gm.set(e.qid,g);}
+    g.answers.push({raw:e.raw,count:e.count});
+  });
+  _reval.groups=[...gm.values()];
+  _reval.selected=new Set();
+  _reval.groups.forEach(g=>g.answers.forEach((e,i)=>_reval.selected.add(g.qid+'::'+i)));
+}
+async function openRevalModal(formId){
+  if(!_isAdmin)return;
+  _reval.formId=formId;_reval.decisions=[];
+  await _revalReload();
+  renderRevalModal();
+  document.getElementById('reval-modal').style.display='flex';
+  _bindRevalKeys();
+}
+function _bindRevalKeys(){
+  _unbindRevalKeys();
+  _reval.keyHandler=function(e){
+    const m=document.getElementById('reval-modal');
+    if(!m||m.style.display==='none'||_reval.mode!=='one')return;
+    if(/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;
+    const it=_reval.queue[_reval.pos];const k=e.key.toLowerCase();
+    if(k==='c'||k==='y'){e.preventDefault();_revalDecide(it&&it.correct?'skip':'accept');}
+    else if(k==='w'||k==='n'){e.preventDefault();_revalDecide(it&&it.correct?'remove':'reject');}
+    else if(k==='s'||k==='arrowright'){e.preventDefault();_revalDecide('skip');}
+    else if(k==='backspace'||k==='arrowleft'){e.preventDefault();_revalUndo();}
+  };
+  document.addEventListener('keydown',_reval.keyHandler);
+}
+function _unbindRevalKeys(){if(_reval.keyHandler){document.removeEventListener('keydown',_reval.keyHandler);_reval.keyHandler=null;}}
+async function _revalFlush(){
+  const pick=t=>_reval.decisions.filter(d=>d.t===t).map(d=>({qid:d.qid,answer:d.raw}));
+  const acc=pick('accept'),rej=pick('reject'),rem=pick('remove');
+  _reval.decisions=[];
+  if(!acc.length&&!rej.length&&!rem.length)return 0;
+  const n=await bulkAcceptAnswers(_reval.formId,acc,rej,rem);
+  renderAttemptsModal();
+  const bits=[];
+  if(acc.length)bits.push(acc.length+' added to the answer bank');
+  if(rem.length)bits.push(rem.length+' removed from it');
+  if(rej.length)bits.push(rej.length+' marked wrong');
+  showShortcutToast(bits.join(' · ')+(acc.length||rem.length?' — attempts rescored':''));
+  return n;
+}
+function closeRevalModal(){
+  document.getElementById('reval-modal').style.display='none';
+  _unbindRevalKeys();
+  _revalFlush().catch(e=>console.warn('reval flush failed',e)); // never lose decisions made so far
+}
+function _revalDecide(t){
+  if(_reval.pos>=_reval.queue.length)return;
+  const it=_reval.queue[_reval.pos];
+  _reval.decisions.push({t,qid:it.qid,raw:it.raw,pos:_reval.pos});
+  _reval.pos++;renderRevalModal();
+}
+function _revalUndo(){
+  if(!_reval.decisions.length)return;
+  const d=_reval.decisions.pop();_reval.pos=d.pos;renderRevalModal();
+}
+function _fullQText(q){
+  const raw=(q.type==='translation'?(q.sourceText||q.label):(q.label||q.sourceText))||'(untitled)';
+  return String(raw).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+}
+async function _revalSetFilter(f,so){
+  try{await _revalFlush();}catch(e){console.warn(e);}
+  if(f)_reval.filter=f;if(so)_reval.sort=so;
+  await _revalReload();renderRevalModal();
+}
+function _revalHeader(body){
+  const tabs=_makeDiv('weak-controls');
+  tabs.appendChild(_makeBtn('hx-btn'+(_reval.mode==='one'?' primary':''),'One by one',()=>{_reval.mode='one';renderRevalModal();}));
+  tabs.appendChild(_makeBtn('hx-btn'+(_reval.mode==='bulk'?' primary':''),'Bulk list',()=>{_reval.mode='bulk';renderRevalModal();}));
+  if(_reval.rejCount>0){
+    const rs=_makeBtn('hx-btn','Show '+_reval.rejCount+' rejected again',async()=>{
+      const ql=await _loadFormQuestionList(_reval.formId);ql.forEach(q=>{if(q.rejectedAnswers)q.rejectedAnswers=[];});
+      if(currentFormId===_reval.formId)triggerAutoSave();
+      else await _persistWithRetry(()=>dbPutOne(STORE_QUESTIONS,{formId:_reval.formId,items:ql}),{label:'reset rejected'});
+      _reval.decisions=[];await _revalReload();renderRevalModal();
+    });
+    rs.style.marginLeft='auto';tabs.appendChild(rs);
+  }
+  body.appendChild(tabs);
+  if(_reval.mode!=='one')return;
+  const nW=_reval.all.filter(e=>!e.correct).length,nC=_reval.all.filter(e=>e.correct).length;
+  const fr=_makeDiv('weak-controls');
+  [['wrong','✗ Marked wrong ('+nW+')'],['correct','✓ Marked correct ('+nC+')'],['all','All ('+(nW+nC)+')']].forEach(([k,label])=>{
+    fr.appendChild(_makeBtn('hx-btn'+(_reval.filter===k?' primary':''),label,()=>_revalSetFilter(k,null)));
+  });
+  const sl=document.createElement('label');sl.style.cssText='margin-left:auto;font-size:11.5px;color:var(--text2);display:flex;align-items:center;gap:5px';
+  sl.append(document.createTextNode('Sort'));
+  const sel=document.createElement('select');sel.style.cssText='border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:12px;background:var(--surface);color:var(--text)';
+  [['count','Most typed first'],['order','Question order'],['alpha','A → Z']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;if(_reval.sort===v)o.selected=true;sel.appendChild(o);});
+  sel.addEventListener('change',()=>_revalSetFilter(null,sel.value));
+  sl.appendChild(sel);fr.appendChild(sl);body.appendChild(fr);
+}
+function renderRevalModal(){
+  const body=document.getElementById('reval-modal-body');body.innerHTML='';
+  _revalHeader(body);
+  if(_reval.mode==='bulk'){
+    if(!_reval.groups.length){const e=_makeDiv('weak-empty');e.textContent='No wrong answers waiting for review.';body.appendChild(e);return;}
+    _renderRevalBulk(body);return;
+  }
+  if(!_reval.queue.length){
+    const e=_makeDiv('weak-empty');
+    e.textContent=_reval.filter==='wrong'?'No wrong answers waiting for your review. Switch to "Marked correct" to double-check the accepted ones.':_reval.filter==='correct'?'No answers are currently marked correct.':'No typed answers found for this exam.';
+    body.appendChild(e);return;
+  }
+  const total=_reval.queue.length;
+  const cnt=t=>_reval.decisions.filter(d=>d.t===t).length;
+  const prog=_makeDiv('weak-meta');
+  prog.textContent=Math.min(_reval.pos+1,total)+' of '+total+' · ✓ '+cnt('accept')+' added · ✗ '+(cnt('reject')+cnt('remove'))+' wrong · '+cnt('skip')+' skipped/kept';
+  body.appendChild(prog);
+  const track=_makeDiv('weak-acc');track.style.cssText='width:100%;text-align:left;margin:6px 0 12px';
+  const bar=_makeDiv('bar');const fill=document.createElement('i');fill.style.cssText='width:'+Math.round(_reval.pos/total*100)+'%;background:var(--green)';bar.appendChild(fill);track.appendChild(bar);body.appendChild(track);
+  if(_reval.pos>=total){
+    const d=_makeDiv('weak-empty');
+    const h=document.createElement('div');h.style.cssText='font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px';h.textContent='All answers reviewed 🎉';
+    const t=document.createElement('div');t.textContent=cnt('accept')+' will be added to the answer bank, '+cnt('remove')+' removed from it, and '+cnt('reject')+' remembered as wrong. Attempts are rescored automatically.';
+    d.append(h,t);body.appendChild(d);
+    const row=_makeDiv('weak-foot');
+    row.appendChild(_makeBtn('hx-btn','← Undo last',_revalUndo));
+    const go=_makeBtn('hx-btn primary','✓ Apply & rescore',async()=>{go.disabled=true;go.textContent='Applying…';try{await _revalFlush();await _revalReload();renderRevalModal();}catch(e){console.warn(e);go.disabled=false;go.textContent='✓ Apply & rescore';}});
+    row.appendChild(go);body.appendChild(row);return;
+  }
+  const it=_reval.queue[_reval.pos];
+  const q=_reval.qMap.get(it.qid)||it.q;const h=QUESTION_TYPES[q.type];
+  const card=_makeDiv('rv-card');card.style.cssText='border:1.5px solid var(--border);border-radius:12px;padding:16px;background:var(--surface)';
+  const badge=document.createElement('span');
+  badge.textContent=it.correct?'✓ Currently marked CORRECT':'✗ Currently marked WRONG';
+  badge.style.cssText='display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:3px 10px;margin-bottom:10px;'+(it.correct?'background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)':'background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)');
+  const ql=_makeDiv('weak-meta');ql.textContent=q.type==='translation'?'Translate:':'Question:';
+  const qt=_makeDiv('rv-q');qt.style.fontSize='15px';qt.textContent=_fullQText(q);
+  const al=_makeDiv('weak-meta');al.style.marginTop='12px';al.textContent='Answer given'+(it.count>1?' (typed '+it.count+'×)':'')+':';
+  const av=_makeDiv('rv-ans');av.style.cssText='font-size:16px;font-weight:600;padding:10px 12px;border-radius:8px;margin-top:4px;word-break:break-word;background:'+(it.correct?'var(--green-bg)':'var(--amber-bg)');av.textContent=it.raw;
+  const kl=_makeDiv('weak-meta');kl.style.marginTop='12px';kl.textContent='Answer bank (accepted answers):';
+  const kv=_makeDiv('rv-key');kv.style.cssText='font-size:13px;color:var(--text2);margin-top:4px;word-break:break-word';
+  kv.textContent=(h?h.formatCorrect(q):'')||'(none)';
+  card.append(badge,ql,qt,al,av,kl,kv);body.appendChild(card);
+  const row=_makeDiv('weak-foot');row.style.justifyContent='space-between';
+  const left=_makeDiv('weak-controls');left.style.margin='0';
+  left.appendChild(_makeBtn('hx-btn','← Undo',_revalUndo));left.appendChild(_makeBtn('hx-btn','Skip',()=>_revalDecide('skip')));
+  const right=_makeDiv('weak-controls');right.style.margin='0';
+  if(it.correct){
+    const bad=_makeBtn('hx-btn','✗ Not correct — remove from bank',()=>_revalDecide('remove'));bad.style.cssText='color:var(--red);border-color:var(--red-border)';
+    const good=_makeBtn('hx-btn primary','✓ Truly correct',()=>_revalDecide('skip'));good.style.cssText='background:var(--green);border-color:var(--green)';
+    right.append(bad,good);
+  }else{
+    const wrong=_makeBtn('hx-btn','✗ Wrong',()=>_revalDecide('reject'));wrong.style.cssText='color:var(--red);border-color:var(--red-border)';
+    const ok=_makeBtn('hx-btn primary','✓ Correct — add to bank',()=>_revalDecide('accept'));ok.style.cssText='background:var(--green);border-color:var(--green)';
+    right.append(wrong,ok);
+  }
+  row.append(left,right);body.appendChild(row);
+  const hint=_makeDiv('weak-meta');hint.style.marginTop='8px';hint.textContent='Shortcuts: C = correct · W = wrong · S = skip · Backspace = undo. Decisions are saved when you finish, change the filter, or close this window.';
+  body.appendChild(hint);
+}
+function _renderRevalBulk(body){
+  const info=_makeDiv('rv-banner');
+  info.textContent='Everything is ticked by default — untick any that really are wrong, then accept the rest in one click.';
+  body.appendChild(info);
+  const bar=_makeDiv('weak-controls');
+  bar.appendChild(_makeBtn('hx-btn','Tick all',()=>{_reval.groups.forEach(g=>g.answers.forEach((e,i)=>_reval.selected.add(g.qid+'::'+i)));renderRevalModal();}));
+  bar.appendChild(_makeBtn('hx-btn','Untick all',()=>{_reval.selected=new Set();renderRevalModal();}));
+  body.appendChild(bar);
+  const list=_makeDiv('weak-list');list.style.maxHeight='42vh';
+  _reval.groups.forEach(g=>{
+    const grp=_makeDiv('rv-group');
+    const q=_makeDiv('rv-q');q.textContent=_weakText(g.q);
+    const h=QUESTION_TYPES[g.q.type];const key=_makeDiv('rv-key');key.textContent='Current answer key: '+(h?h.formatCorrect(_reval.qMap.get(g.qid)||g.q):'');
+    grp.append(q,key);
+    g.answers.forEach((e,i)=>{
+      const id=g.qid+'::'+i;
+      const row=document.createElement('label');row.className='rv-row'+(_reval.selected.has(id)?' sel':'');
+      const cb=document.createElement('input');cb.type='checkbox';cb.checked=_reval.selected.has(id);
+      cb.addEventListener('change',()=>{cb.checked?_reval.selected.add(id):_reval.selected.delete(id);row.classList.toggle('sel',cb.checked);updateRevalFooter();});
+      const main=document.createElement('div');
+      const a=_makeDiv('rv-ans');a.textContent=e.raw;
+      const c=_makeDiv('rv-count');c.textContent='typed '+e.count+'×';
+      main.append(a,c);row.append(cb,main);grp.appendChild(row);
+    });
+    list.appendChild(grp);
+  });
+  body.appendChild(list);
+  const foot=_makeDiv('weak-foot');
+  const go=_makeBtn('hx-btn primary','',async()=>{
+    const entries=[];
+    _reval.groups.forEach(g=>g.answers.forEach((e,i)=>{if(_reval.selected.has(g.qid+'::'+i))entries.push({qid:g.qid,answer:e.raw});}));
+    go.disabled=true;go.textContent='Accepting…';
+    try{
+      const n=await bulkAcceptAnswers(_reval.formId,entries);
+      document.getElementById('reval-modal').style.display='none';_unbindRevalKeys();_reval.decisions=[];renderAttemptsModal();
+      showShortcutToast(n?n+' answer'+(n!==1?'s':'')+' added to the answer bank — attempts rescored':'Nothing new to accept');
+    }catch(e){console.warn('bulk accept failed',e);go.disabled=false;updateRevalFooter();}
+  });
+  go.id='reval-go-btn';foot.appendChild(go);body.appendChild(foot);
+  updateRevalFooter();
+}
+function updateRevalFooter(){
+  const go=document.getElementById('reval-go-btn');if(!go)return;
+  go.textContent='✓ Accept '+_reval.selected.size+' selected & rescore all';go.disabled=_reval.selected.size===0;
 }
 
 // §SORT ───────────────────────────────────────────────────────────────────────
@@ -14430,6 +14804,7 @@ function _handleTrapEscape(e){
     {id:'attempts-modal',open:'openAttemptsModal',close:'closeAttemptsModal'},
     {id:'attempt-detail-modal',open:'openAttemptDetailModal',close:'closeAttemptDetailModal'},
     {id:'weak-modal',open:'openWeakModal',close:'closeWeakModal'},
+    {id:'reval-modal',open:'openRevalModal',close:'closeRevalModal'},
     {id:'import-modal',open:'openImportModal',close:'closeImportModal'},
     {id:'lib-modal',open:'openLibModal',close:'closeLibModal'},
     {id:'duplicates-modal',open:'openDuplicatesModal',close:'closeDuplicatesModal'},
