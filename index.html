@@ -6976,6 +6976,13 @@ function retrogradeScoreAttempts(formId, opts, questionsOverride){
       attempt.score=r.pct;attempt.earned=r.earned;attempt.total=r.total;
       attempt.correct=r.correct;attempt.wrong=r.wrong;attempt.hasScorable=r.hasScorable;
       attempt.rescored=true;attempt.updatedAt=Date.now();
+      // keep the saved key in sync so the attempt review shows the same ✓/✗ as the score
+      attempt.questionSnapshot=currentQuestions.map(q=>({
+        id:q.id,type:q.type,label:q.label,points:q.points,correct:q.correct,correctTF:q.correctTF,
+        sourceText:q.sourceText,
+        acceptableAnswers:q.acceptableAnswers?[...q.acceptableAnswers]:undefined,
+        pairs:q.pairs?JSON.parse(JSON.stringify(q.pairs)):undefined,
+        options:q.options?[...q.options]:undefined}));
       changed.push(attempt);
       if(oldScore!==r.pct)rescored++;
     } else {
@@ -7046,8 +7053,9 @@ async function retrogradeScoreAttemptsForForm(formId, opts){
     retrogradeScoreAttempts(formId, opts);
     return;
   }
-  const rec=await loadQuestions(formId).catch(()=>null);
-  const qs=(rec&&rec.items)?rec.items.filter(it=>it.kind==='question'):[];
+  // loadQuestions() resolves to the items ARRAY itself (not a {items} record).
+  const rec=await loadQuestions(formId).catch(()=>[]);
+  const qs=(Array.isArray(rec)?rec:((rec&&rec.items)||[])).filter(it=>it.kind==='question');
   retrogradeScoreAttempts(formId, opts, qs);
 }
 
@@ -7760,8 +7768,8 @@ async function acceptAnswerAsCorrect(formId,qid,rawAnswer){
     qList=items;
     q=qList.find(it=>it.id===qid&&it.kind==='question');
   } else {
-    const rec=await loadQuestions(formId).catch(()=>null);
-    qList=(rec&&rec.items)?rec.items:[];
+    const rec=await loadQuestions(formId).catch(()=>[]);
+    qList=Array.isArray(rec)?rec:((rec&&rec.items)||[]);
     q=qList.find(it=>it.id===qid&&it.kind==='question');
   }
   if(!q){
@@ -9722,7 +9730,7 @@ function selectItem(id){
     renderBuilder();
   }
 }
-function deleteItem(id){const it2=items.find(it=>it.id===id);pushHistory(it2?(it2.kind==='section'?'Delete section':'Delete question'):'Delete');if(it2)_adjustItemCounters(it2.kind,-1);setState({items:items.filter(it=>it.id!==id)});if(selectedId===id)setState({selectedId:null});renderBuilder();triggerAutoSave();}
+function deleteItem(id){const it2=items.find(it=>it.id===id);pushHistory(it2?(it2.kind==='section'?'Delete section':'Delete question'):'Delete');if(it2)_adjustItemCounters(it2.kind,-1);setState({items:items.filter(it=>it.id!==id)});if(selectedId===id)setState({selectedId:null});renderBuilder();(it2&&it2.kind==='question')?triggerAutoSaveWithRescore():triggerAutoSave();}
 // FIX 1: updateLabel used to call triggerAutoSave() which tears down and
 // rebuilds the entire virtual list on every keystroke. For 50+ question quizzes
 // this caused visible lag while typing. Now we only update the in-memory model
@@ -9738,7 +9746,21 @@ const _debouncedDupRefresh=_debounce(()=>_refreshDuplicateFlags(),250);
 function updateLabel(id,val){const q=items.find(it=>it.id===id);if(q){q.label=val;_debouncedDupRefresh();_debouncedAutoSave();}}
 function updateSectionTitle(id,val){const s=items.find(it=>it.id===id);if(s){s.title=val;triggerAutoSave();}}
 function updateSectionDesc(id,val){const s=items.find(it=>it.id===id);if(s){s.description=val;triggerAutoSave();}}
-function updateOption(id,idx,val){const q=items.find(it=>it.id===id);if(q&&q.options){q.options[idx]=val;triggerAutoSave();}}
+function updateOption(id,idx,val){
+  const q=items.find(it=>it.id===id);
+  if(q&&q.options){
+    // The answer key stores the option's TEXT, so renaming the correct option used to
+    // silently orphan the key (nothing could ever match again). Carry the key along.
+    const old=q.options[idx];
+    if(old!=null&&q.correct&&typeof q.correct==='string'){
+      const norm=x=>String(x).trim().toLowerCase();
+      if(q.type==='checkbox'){q.correct=q.correct.split('|||').map(c=>norm(c)===norm(old)?val:c).join('|||');}
+      else if(norm(q.correct)===norm(old)){q.correct=val;}
+    }
+    q.options[idx]=val;
+    triggerAutoSaveWithRescore();
+  }
+}
 function updatePairLeft(id,idx,val){const q=items.find(it=>it.id===id);if(q&&q.pairs){q.pairs[idx].left=val;triggerAutoSaveWithRescore();}}
 function updatePairRight(id,idx,val){const q=items.find(it=>it.id===id);if(q&&q.pairs){q.pairs[idx].right=val;triggerAutoSaveWithRescore();}}
 function updateAcceptableAnswer(id,idx,val){const q=items.find(it=>it.id===id);if(q&&q.acceptableAnswers){q.acceptableAnswers[idx]=val;triggerAutoSaveWithRescore();}}
@@ -9759,7 +9781,7 @@ function updateType(id,val){
   renderBuilder();triggerAutoSaveWithRescore();
 }
 function addOption(id){pushHistory('Add option');const q=items.find(it=>it.id===id);if(!q)return;q.options.push('Option '+(q.options.length+1));renderBuilder();setTimeout(()=>{const ins=document.querySelectorAll('.opt-input[data-qid="'+id+'"]');if(ins.length)ins[ins.length-1].focus();},30);triggerAutoSave();}
-function deleteOption(id,idx){pushHistory('Delete option');const q=items.find(it=>it.id===id);if(!q||q.options.length<=1)return;q.options.splice(idx,1);renderBuilder();triggerAutoSave();}
+function deleteOption(id,idx){pushHistory('Delete option');const q=items.find(it=>it.id===id);if(!q||q.options.length<=1)return;q.options.splice(idx,1);renderBuilder();triggerAutoSaveWithRescore();}
 function toggleRequired(id){const q=items.find(it=>it.id===id);if(q)q.required=!q.required;const t=document.querySelector(`#qcard-${id} .toggle-track`);if(t)t.classList.toggle('on',q.required);triggerAutoSave();}
 function addPair(id){pushHistory('Add pair');const q=items.find(it=>it.id===id);if(!q)return;q.pairs.push({left:'Item '+(q.pairs.length+1),right:'Target '+(q.pairs.length+1)});renderBuilder();triggerAutoSaveWithRescore();}
 function deletePair(id,idx){pushHistory('Delete pair');const q=items.find(it=>it.id===id);if(!q||q.pairs.length<=1)return;q.pairs.splice(idx,1);renderBuilder();triggerAutoSaveWithRescore();}
@@ -10517,7 +10539,7 @@ function bindBuilderEvents(){
       if(it.options){it.options.forEach((_,idx)=>{const oi=card.querySelector(`.opt-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(oi){oi.removeEventListener('input',oi._h);oi._h=e=>updateOption(it.id,idx,e.target.value);oi.addEventListener('input',oi._h);}});}
       if(it.pairs){it.pairs.forEach((_,idx)=>{const pl=card.querySelector(`.pair-left[data-qid="${it.id}"][data-idx="${idx}"]`);const pr=card.querySelector(`.pair-right[data-qid="${it.id}"][data-idx="${idx}"]`);if(pl){pl.removeEventListener('input',pl._h);pl._h=e=>updatePairLeft(it.id,idx,e.target.value);pl.addEventListener('input',pl._h);}if(pr){pr.removeEventListener('input',pr._h);pr._h=e=>updatePairRight(it.id,idx,e.target.value);pr.addEventListener('input',pr._h);}});}
       if(it.acceptableAnswers){it.acceptableAnswers.forEach((_,idx)=>{const ai=card.querySelector(`.trans-ans-input[data-qid="${it.id}"][data-idx="${idx}"]`);if(ai){ai.removeEventListener('input',ai._h);ai._h=e=>updateAcceptableAnswer(it.id,idx,e.target.value);ai.addEventListener('input',ai._h);}});}
-      const pi=card.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value,10)||0;triggerAutoSave();}};pi.addEventListener('input',pi._h);}
+      const pi=card.querySelector(`.points-input[data-qid="${it.id}"]`);if(pi){pi.removeEventListener('input',pi._h);pi._h=e=>{const q=items.find(x=>x.id===it.id);if(q){q.points=parseInt(e.target.value,10)||0;triggerAutoSaveWithRescore();}};pi.addEventListener('input',pi._h);}
       const ts=card.querySelector(`.trans-source[data-qid="${it.id}"]`);if(ts){ts.removeEventListener('input',ts._h);ts._h=e=>{
         const q=items.find(x=>x.id===it.id);
         if(q){
