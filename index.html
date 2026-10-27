@@ -10,7 +10,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#5c35b1">
+<meta name="theme-color" content="#181a24">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="Quiz Builder">
@@ -30,7 +30,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self';">
 <title>Form & Quiz Builder</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- Google Identity Services — used by the Drive-sync module (§DRIVE) for OAuth. -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -188,7 +188,7 @@ body.role-viewer #integrity-banner{display:flex}
    reachable until Google sign-in succeeds AND the signed-in account can
    actually read the target quiz (see _shareGateSignIn / openShareLinkModal). */
 #share-gate-view{position:fixed;inset:0;z-index:5000;background:var(--surface2);display:none;align-items:center;justify-content:center;padding:20px}
-.share-gate-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;max-width:420px;width:100%;padding:32px 28px;text-align:center;box-shadow:0 8px 32px rgba(92,53,177,.14)}
+.share-gate-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;max-width:420px;width:100%;padding:32px 28px;text-align:center;box-shadow:0 8px 32px rgba(230,83,44,.14)}
 .share-gate-logo{width:52px;height:52px;background:var(--purple);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
 .share-gate-logo svg{width:28px;height:28px}
 .share-gate-title{font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px}
@@ -307,7 +307,7 @@ body.role-viewer #integrity-banner{display:flex}
 .dash-search-box{position:relative;flex:1;min-width:180px;max-width:360px}
 .dash-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3);pointer-events:none;flex-shrink:0}
 .dash-search-input{width:100%;border:1.5px solid var(--border);border-radius:20px;padding:7px 34px 7px 32px;font-size:13px;font-family:inherit;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s,box-shadow .15s}
-.dash-search-input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(92,53,177,.1)}
+.dash-search-input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(230,83,44,.1)}
 .dash-search-input::placeholder{color:var(--text3)}
 .dash-search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;line-height:1;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:50%;transition:color .12s,background .12s}
 .dash-search-clear:hover{color:var(--text);background:var(--surface2)}
@@ -508,7 +508,7 @@ body.theme-classic .dup-flag{margin-top:4px}
   border-radius:2px;
   margin:0 8px;
   animation:gap-pulse .55s infinite alternate;
-  box-shadow:0 0 0 3px rgba(92,53,177,.18);
+  box-shadow:0 0 0 3px rgba(230,83,44,.18);
   pointer-events:none;
   transition:opacity .1s;
 }
@@ -1020,7 +1020,7 @@ kbd{background:var(--surface);border:1.5px solid var(--border);border-bottom-wid
 .btn-shortcuts{background:rgba(255,255,255,.12);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:11px;font-weight:500;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .15s}
 .btn-shortcuts:hover{background:rgba(255,255,255,.22);color:#fff}
 .btn-shortcuts kbd{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;font-size:9px;padding:1px 4px}
-@keyframes select-ring{0%{box-shadow:0 0 0 0 rgba(92,53,177,.4)}100%{box-shadow:0 0 0 6px rgba(92,53,177,0)}}
+@keyframes select-ring{0%{box-shadow:0 0 0 0 rgba(230,83,44,.4)}100%{box-shadow:0 0 0 6px rgba(230,83,44,0)}}
 .q-card.kb-selected{animation:select-ring .35s ease forwards}
 
 .btn-undo-redo{display:flex;align-items:center;gap:1px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:6px;overflow:hidden}
@@ -1030,7 +1030,7 @@ kbd{background:var(--surface);border:1.5px solid var(--border);border-bottom-wid
 .btn-ur+.btn-ur{border-left:1px solid rgba(255,255,255,.18)}
 .btn-ur svg{width:13px;height:13px}
 .ur-count{font-size:9px;font-weight:700;line-height:1;min-width:13px;text-align:center;background:rgba(255,255,255,.22);border-radius:8px;padding:1px 4px;margin-left:2px;display:inline-block}
-.kbd-row.undo-row{border:1px solid rgba(92,53,177,.25);background:var(--purple-dim)}
+.kbd-row.undo-row{border:1px solid rgba(230,83,44,.25);background:var(--purple-dim)}
 
 /* JS-generated element utility classes */
 .js-no-attempts{font-size:10px;color:var(--text3)}
@@ -1119,8 +1119,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    currently rendered by the virtual scroller — see renderQSearchResults()). */
 .qsearch-wrap{position:sticky;top:var(--topbar-h);z-index:40;background:var(--surface2);padding:8px 0;margin:-8px 0 2px;display:flex;flex-direction:column;gap:6px}
 .qsearch-row{display:flex;align-items:center;gap:8px;position:relative}
-.qsearch-box{position:relative;flex:1;display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:0 10px;box-shadow:0 1px 4px rgba(92,53,177,.06)}
-.qsearch-box:focus-within{border-color:var(--purple);box-shadow:0 0 0 3px rgba(92,53,177,.1)}
+.qsearch-box{position:relative;flex:1;display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:0 10px;box-shadow:0 1px 4px rgba(230,83,44,.06)}
+.qsearch-box:focus-within{border-color:var(--purple);box-shadow:0 0 0 3px rgba(230,83,44,.1)}
 .qsearch-icon{width:14px;height:14px;color:var(--text3);flex-shrink:0}
 .qsearch-input{flex:1;border:none;outline:none;background:transparent;font-size:13px;color:var(--text);padding:9px 8px}
 .qsearch-input::placeholder{color:var(--text3)}
@@ -1136,7 +1136,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .qsearch-result-snippet{font-size:12.5px;color:var(--text2);line-height:1.45;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .qsearch-result-snippet mark{background:#fff3a3;color:var(--text);border-radius:2px;padding:0 1px}
 .qsearch-empty{padding:16px 14px;font-size:12.5px;color:var(--text3);text-align:center}
-@keyframes qcard-flash-kf{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--purple),0 4px 16px rgba(92,53,177,.25)}}
+@keyframes qcard-flash-kf{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--purple),0 4px 16px rgba(230,83,44,.25)}}
 .qcard-flash{animation:qcard-flash-kf 1.4s ease}
 
 /* Persistent section breadcrumb — sticky nav shown while scrolling a long
@@ -1190,7 +1190,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .bank-tag-btn.active{background:var(--purple);color:#fff;border-color:var(--purple)}
 .bank-list{padding:10px 20px 16px;max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
 .bank-item{background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative}
-.bank-item:hover{border-color:var(--purple-mid);box-shadow:0 2px 10px rgba(92,53,177,.1)}
+.bank-item:hover{border-color:var(--purple-mid);box-shadow:0 2px 10px rgba(230,83,44,.1)}
 .bank-item.selected{border-color:var(--purple);background:var(--purple-dim)}
 .bank-item-label{font-size:13px;font-weight:500;color:var(--text);margin-bottom:5px}
 .bank-item-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
@@ -2136,7 +2136,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   color: var(--purple, #5c35b1);
   border: 2px solid var(--purple, #5c35b1);
   padding: 9px 16px 9px 12px;
-  box-shadow: 0 4px 14px rgba(92,53,177,.18);
+  box-shadow: 0 4px 14px rgba(230,83,44,.18);
 }
 .fab-btn--outline:hover {
   background: var(--purple-dim);
@@ -2149,7 +2149,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   border: none;
   padding: 11px 18px 11px 14px;
   font-size: 13px;
-  box-shadow: 0 4px 16px rgba(92,53,177,.35);
+  box-shadow: 0 4px 16px rgba(230,83,44,.35);
 }
 .fab-btn--primary:hover {
   background: var(--purple-light);
@@ -2205,7 +2205,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: -3px 3px 14px rgba(92,53,177,.35);
+  box-shadow: -3px 3px 14px rgba(230,83,44,.35);
   transition: background .15s;
 }
 .toc-toggle:hover { background: var(--purple-light); }
@@ -2218,7 +2218,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   border: 1.5px solid var(--border);
   border-right: none;
   border-radius: 10px 0 0 10px;
-  box-shadow: -4px 4px 24px rgba(92,53,177,.13);
+  box-shadow: -4px 4px 24px rgba(230,83,44,.13);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2320,7 +2320,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .score-summary-label{font-weight:500}
 
 /* Drag-drop: keyboard-selection highlight */
-.p-drag-item.kb-selected{outline:3px solid var(--purple,#5c35b1);outline-offset:2px;background:var(--purple-dim);border-color:var(--purple-mid);box-shadow:0 0 0 4px rgba(92,53,177,.15)}
+.p-drag-item.kb-selected{outline:3px solid var(--purple,#5c35b1);outline-offset:2px;background:var(--purple-dim);border-color:var(--purple-mid);box-shadow:0 0 0 4px rgba(230,83,44,.15)}
 .p-drag-item:focus-visible{outline:3px solid var(--purple,#5c35b1);outline-offset:2px}
 .p-drag-slot:focus-visible{outline:3px solid var(--purple,#5c35b1);outline-offset:2px}
 
@@ -2348,7 +2348,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:13px;font-weight:600;padding:11px 22px;
   cursor:pointer;transition:all .15s;width:100%;margin-top:6px;
 }
-.success-share-btn:hover{background:var(--purple);color:#fff;box-shadow:0 2px 10px rgba(92,53,177,.25);transform:translateY(-1px)}
+.success-share-btn:hover{background:var(--purple);color:#fff;box-shadow:0 2px 10px rgba(230,83,44,.25);transform:translateY(-1px)}
 
 /* ════════════════════════════════════════════════════════════════
    SECTION JUMP DROPDOWN — toolbar navigator for 300+ question forms
@@ -2431,7 +2431,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   border: 2px solid var(--purple);
   border-radius: 50px;
   padding: 8px 14px 8px 12px;
-  box-shadow: 0 4px 14px rgba(92,53,177,.18);
+  box-shadow: 0 4px 14px rgba(230,83,44,.18);
   cursor: pointer;
   transition: all .15s;
 }
@@ -2728,7 +2728,7 @@ button,
 .drag-ghost {
   position: fixed; z-index: 9999; pointer-events: none;
   opacity: 0.75; border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(92,53,177,.3);
+  box-shadow: 0 8px 28px rgba(230,83,44,.3);
   background: var(--surface); border: 2px dashed var(--purple);
 }
 .q-card.touch-dragging { opacity: 0.35; border: 2px dashed var(--purple); }
@@ -3069,7 +3069,7 @@ a.sidebar-nav-item:hover svg.sidebar-nav-item-ext{opacity:.85}
   background-repeat:no-repeat;background-position:10px center;background-size:14px 14px;
 }
 .bank-item{padding-right:38px}
-.bank-item.selected{box-shadow:0 2px 10px rgba(92,53,177,.12)}
+.bank-item.selected{box-shadow:0 2px 10px rgba(230,83,44,.12)}
 .bank-item.selected::after{
   content:'';position:absolute;top:12px;right:12px;width:18px;height:18px;
   border-radius:50%;background:var(--purple);
@@ -3362,6 +3362,23 @@ html body.qb-focus .sticky-nav-rail{top:0}
   html body.qb-focus .sticky-nav-rail{padding-left:46px}
 }
 @media print{#sidebar-toggle-btn,#focus-toggle-btn,.focus-exit-group{display:none!important}}
+</style>
+<style id="qb-fullscreen-fixes">
+/* ── Fix: blinking in focus / full-screen mode ──────────────────────────────
+   1. renderPreview() deletes and re-creates #sticky-preview-nav on every answer
+      click, which replayed the sticky-in fade (opacity 0 -> 1) each time.
+   2. The .app grid-template-columns transition animated a full-page reflow
+      whenever focus mode / fullscreen toggled.
+   3. backdrop-filter on the sticky rail re-composites on every re-render.
+   4. The scrollbar appears/disappears while the preview DOM is rebuilt,
+      shifting the layout sideways for a frame. */
+html{scrollbar-gutter:stable}
+.sticky-nav-rail{animation:none!important}
+html body.qb-focus .app{transition:none!important}
+html body.qb-focus .sticky-nav-rail{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--surface)}
+html body.qb-focus #preview-content{min-height:100dvh}
+.app,.shell-main{min-height:100vh;min-height:100dvh}
+:fullscreen body,:-webkit-full-screen body{background-color:var(--surface2)}
 </style>
 <style id="qb-v2-additions">
 /* ── Extra colour themes: only override palette vars; layout stays "new look" ── */
@@ -12495,7 +12512,7 @@ function renderStickyNav(pages, activePage, fc){
 
   setTimeout(()=>{
     const cur=rail.querySelector('.sticky-sec-btn.current');
-    if(cur)cur.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+    if(cur)cur.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
   },50);
 }
 
@@ -13504,27 +13521,30 @@ function startPreviewTimer(resumeSeconds=null){
     // flags were saved instead of restarting the full countdown.
     setState({ previewTimerRemaining: resumeSeconds });
   }
-  setState({ previewTimerInterval: setInterval(()=>{
-    if(previewTimerRemaining<=0){
-      stopPreviewTimer();
-      const score=computeScore();
-      setState({previewSubmitted:true,previewScore:score});
-      saveAttempt(score);
-      renderPreview();
-      return;
-    }
-    setState({ previewTimerRemaining: previewTimerRemaining - 1 });
-    updateTimerDisplay();
-    _checkTimerWarnings();
-    if(previewTimerRemaining<=0){
-      stopPreviewTimer();
-      const score=computeScore();
-      setState({previewSubmitted:true,previewScore:score});
-      saveAttempt(score);
-      renderPreview();
-    }
-  },1000)});
+  // Wall-clock deadline: browsers throttle setInterval in background tabs, so
+  // counting ticks lets the clock fall behind. Derive the remaining time from
+  // the real clock on every tick instead.
+  _previewTimerDeadline=Date.now()+previewTimerRemaining*1000;
+  setState({ previewTimerInterval: setInterval(_previewTimerTick,1000) });
 }
+let _previewTimerDeadline=0;
+function _previewTimerTick(){
+  if(!previewTimerInterval)return;
+  const left=Math.max(0,Math.ceil((_previewTimerDeadline-Date.now())/1000));
+  if(left!==previewTimerRemaining)setState({ previewTimerRemaining:left });
+  updateTimerDisplay();
+  if(previewTimerRemaining<=0){
+    stopPreviewTimer();
+    const score=computeScore();
+    setState({previewSubmitted:true,previewScore:score});
+    saveAttempt(score);
+    renderPreview();
+    return;
+  }
+  _checkTimerWarnings();
+}
+// Catch up immediately when the tab becomes visible again.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)_previewTimerTick();});
 /**
  * Fires a one-time, non-blocking warning at 2 minutes and again at 30 seconds
  * remaining, so a running countdown can't silently reach 0 and auto-submit
