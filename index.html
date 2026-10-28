@@ -3376,9 +3376,22 @@ html{scrollbar-gutter:stable}
 .sticky-nav-rail{animation:none!important}
 html body.qb-focus .app{transition:none!important}
 html body.qb-focus .sticky-nav-rail{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--surface)}
-html body.qb-focus #preview-content{min-height:100dvh}
-.app,.shell-main{min-height:100vh;min-height:100dvh}
 :fullscreen body,:-webkit-full-screen body{background-color:var(--surface2)}
+/* ── Fix: blink when tapping/typing in an exam field (on-screen keyboard) ─────
+   Typing itself only updates the progress bar, nothing re-renders. The flash
+   comes from the browser reacting to the keyboard opening:
+   1. iOS Safari zooms the whole page when a focused field is under 16px
+      (these inputs were 13px) and zooms back out on blur.
+   2. The sticky progress rail uses a blurred translucent background that
+      re-composites every frame while the keyboard animates.
+   3. The browser auto-scrolls the focused field into view; without a scroll
+      margin it lands under the sticky rail and gets nudged a second time. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.p-text-input,.p-textarea{scroll-margin-top:110px;scroll-margin-bottom:140px;touch-action:manipulation}
+@media (hover:none) and (pointer:coarse){
+  .p-text-input,.p-textarea,.p-select,.p-match-select,.p-drag-select-fallback{font-size:16px}
+  .sticky-nav-rail{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--surface)}
+}
 </style>
 <style id="qb-v2-additions">
 /* ── Extra colour themes: only override palette vars; layout stays "new look" ── */
