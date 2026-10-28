@@ -11264,11 +11264,9 @@ const QUESTION_TYPES = {
     buildPreview(q,ans){
       // Build the full bank and slot structures (same logic as before).
       const slots=q.pairs.map((p,i)=>({label:p.right,id:'slot-'+q.id+'-'+i}));
-      const bank=q.pairs.map((p,i)=>({label:p.left,id:'item-'+q.id+'-'+i}));
-      // Shuffle bank for display (only when no answer set yet, to keep display stable on re-render).
-      if(!ans||Object.keys(ans).length===0){
-        for(let i=bank.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bank[i],bank[j]]=[bank[j],bank[i]];}
-      }
+      // Order is shuffled ONCE per question per attempt and cached, so the items are
+      // never listed in the authored (= correct) order and never jump on re-render.
+      const bank=_stableDragBank(q,q.pairs.map((p,i)=>({label:p.left,id:'item-'+q.id+'-'+i})));
       const ao=ans||{};
       const used=Object.values(ao);
       const avail=bank.filter(b=>!used.includes(b.id));
@@ -11356,7 +11354,7 @@ const QUESTION_TYPES = {
       frag.append(mp,addPairBtn);
     },
     buildPreview(q,ans){
-      const v2=ans||{};const rights=q.pairs.map(p=>p.right);
+      const v2=ans||{};const rights=_stableMatchRights(q);
       return`<div class="p-match-area">${q.pairs.map((p,pi)=>`<div class="p-match-row"><div class="p-match-term">${escHtml(p.left)}</div><span class="p-match-arrow">→</span><select class="p-match-select" onchange="setMatchAns(${q.id},${pi},this.value)"><option value="">— Select —</option>${rights.map(r=>`<option value="${escHtml(r)}" ${v2[pi]===r?'selected':''}>${escHtml(r)}</option>`).join('')}</select></div>`).join('')}</div>`;
     },
     score(q,ans){
@@ -12400,9 +12398,12 @@ function renderPreview(){
   if(!hmp){html+=`<div class="preview-submit-row"><button class="preview-submit" onclick="submitPreview()" style="background:${fc}">✓ Submit</button><div style="display:flex;gap:8px;align-items:center"><button class="preview-clear" onclick="pausePreview()" title="Save your answers and come back later">💾 Save &amp; Pause</button><button class="preview-clear" onclick="clearPreview()">Clear form</button><button class="preview-clear admin-only" onclick="printQuiz()" title="Print all pages as PDF" style="color:var(--purple);font-weight:600">🖨 Print</button></div></div>`;}
   else{html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:8px;flex-wrap:wrap"><button class="preview-clear" onclick="pausePreview()" title="Save your answers and come back later">💾 Save &amp; Pause</button><div style="display:flex;gap:8px"><button class="preview-clear admin-only" onclick="printQuiz()" title="Print all pages as PDF" style="color:var(--purple);font-weight:600">🖨 Print All Pages</button><button class="preview-clear" onclick="clearPreview()">Clear all answers</button></div></div>`;}
 
+  const _holdH=wrap.offsetHeight;
+  if(_holdH>0)wrap.style.minHeight=_holdH+'px';
   wrap.innerHTML=html;
   bindPreviewInputEvents();initDragDropPreviews();
   renderStickyNav(previewPages,currentPage,fc);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{wrap.style.minHeight='';}));
 }
 
 // Flush any pending draft save immediately if the tab/window is closed or
@@ -13593,6 +13594,33 @@ function initRandomizeUI(){const f=forms.find(x=>x.id===currentFormId);if(!f)ret
 function toggleRandomizeOptions(){setState({randomizeOptionsEnabled:!randomizeOptionsEnabled,previewOptionsOrder:{}});const t=document.getElementById('randomize-options-toggle-track');const l=document.getElementById('randomize-options-toggle-label');const h=document.getElementById('randomize-options-hint');const b=document.getElementById('randomize-options-badge');if(t)t.classList.toggle('on',randomizeOptionsEnabled);if(l)l.textContent=randomizeOptionsEnabled?'Answer choices randomized':'Fixed order';if(h)h.style.display=randomizeOptionsEnabled?'block':'none';if(b)b.style.display=randomizeOptionsEnabled?'inline-flex':'none';saveCurrentForm();if(currentFormId)persistFormById(currentFormId);}
 
 function initRandomizeOptionsUI(){const f=forms.find(x=>x.id===currentFormId);if(!f)return;setState({randomizeOptionsEnabled:!!f.randomizeOptionsEnabled});const t=document.getElementById('randomize-options-toggle-track');const l=document.getElementById('randomize-options-toggle-label');const h=document.getElementById('randomize-options-hint');const b=document.getElementById('randomize-options-badge');if(t)t.classList.toggle('on',randomizeOptionsEnabled);if(l)l.textContent=randomizeOptionsEnabled?'Answer choices randomized':'Fixed order';if(h)h.style.display=randomizeOptionsEnabled?'block':'none';if(b)b.style.display=randomizeOptionsEnabled?'inline-flex':'none';}
+
+// ── Exam anti-leak helpers ───────────────────────────────────────────────────
+// Matching choices and drag items used to be listed in the order the author typed
+// them, which is the same order as the terms/targets — i.e. the answer key. These
+// helpers shuffle once per question per attempt (cached in previewOptionsOrder so a
+// re-render never reshuffles) and never return the authored order when n > 1.
+// They shuffle regardless of the "randomize options" setting on purpose.
+function _stableShuffleCached(key,arr){
+  if(arr.length<2)return arr;
+  const cached=previewOptionsOrder[key];
+  if(Array.isArray(cached)&&cached.length===arr.length){
+    const a=[...cached].sort(),b=[...arr].sort();
+    if(a.every((v,i)=>v===b[i]))return cached;
+  }
+  let out=shuffleArray(arr),tries=0;
+  while(out.every((v,i)=>v===arr[i])&&tries++<8)out=shuffleArray(arr);
+  setState({previewOptionsOrder:{...previewOptionsOrder,[key]:out}});
+  return out;
+}
+function _stableMatchRights(q){
+  return _stableShuffleCached('match:'+q.id,[...new Set(q.pairs.map(p=>p.right))]);
+}
+function _stableDragBank(q,bank){
+  const order=_stableShuffleCached('drag:'+q.id,bank.map(b=>b.id));
+  const byId=new Map(bank.map(b=>[b.id,b]));
+  return order.map(id=>byId.get(id));
+}
 
 function shuffleArray(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
