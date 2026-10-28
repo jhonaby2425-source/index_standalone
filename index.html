@@ -11236,7 +11236,9 @@ const QUESTION_TYPES = {
     },
     buildPreview(q,ans){
       const acceptable=q.acceptableAnswers||[];
-      const hint=acceptable.filter(a=>a.trim()).length>1?`<div class="js-trans-hint-count">${acceptable.filter(a=>a.trim()).length} acceptable answers</div>`:'';
+      // Intentionally no "N acceptable answers" hint here: it tells the student how many
+      // accepted variants exist, which leaks information about the answer key.
+      const hint='';
       // The shared question title is intentionally skipped for this type (see
       // renderPreview), so its required/points indicator lives here instead,
       // next to the source sentence.
